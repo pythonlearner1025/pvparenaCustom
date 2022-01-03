@@ -208,9 +208,16 @@ public class PVPArena extends JavaPlugin {
         arenaCommands.add(new PAG_Arenaclass());
         arenaCommands.add(new PAI_Info());
         arenaCommands.add(new PAI_Stats());
+
+        // mjsong commands
+        arenaCommands.add(new PAA_SetFee());
+        arenaCommands.add(new PAA_SetPot());
+
+
     }
 
     private void loadGlobalCommands() {
+
         globalCommands.add(new PAA_Create());
         globalCommands.add(new PAA_Debug());
         globalCommands.add(new PAA_Duty());

@@ -50,6 +50,10 @@ public class PAG_Join extends AbstractArenaCommand {
             return;
         }
 
+
+        // mjsong try
+        // set CFG.JOININBATTLE to true, will this work?
+
         if (arena.isFightInProgress()
                 && (
                 !arena.getArenaConfig().getBoolean(CFG.PERMS_JOININBATTLE)

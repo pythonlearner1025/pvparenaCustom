@@ -96,6 +96,10 @@ public abstract class ArenaRunnable extends BukkitRunnable {
             }
         }
 
+        // mjsong problem
+        // the instance of this PVPArena is called according to freq set by delay, period.
+        // run() is called to decrement time. The question is, how to access this same run-thread that
+        // Bukkit is calling?
         runTaskTimer(PVPArena.instance, 20L, 20L);
     }
 
@@ -154,6 +158,9 @@ public abstract class ArenaRunnable extends BukkitRunnable {
         }
     }
 
+    // mjsong code: can adding to seconds directly of arenarunnable be an acceptable way to add seconds?
+    //
+
     @Override
     public void run() {
         spam();
@@ -165,6 +172,9 @@ public abstract class ArenaRunnable extends BukkitRunnable {
                 warn();
             }
         }
+
+        // if newplayer joined / respawned, aggragate time
+
         seconds--;
     }
 

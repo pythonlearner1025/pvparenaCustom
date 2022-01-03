@@ -52,4 +52,11 @@ public class TimedEndRunnable extends ArenaRunnable {
     protected void warn() {
         PVPArena.instance.getLogger().warning("TimedEndRunnable not scheduled yet!");
     }
+
+
+    //mjsong21 code:
+    // method to increment Seconds running in ArenaRunnable seperate thread
+    public void incrementTime(int extraTime){
+        seconds += extraTime;
+    }
 }

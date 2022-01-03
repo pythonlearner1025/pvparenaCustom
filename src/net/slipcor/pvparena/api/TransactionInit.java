@@ -51,11 +51,10 @@ public class TransactionInit {
         this.newTransaction = new JSONObject();
 
         // extract players from arena
-        Set<ArenaPlayer> players = arena.getFighters();
+        Set<ArenaPlayer> players = arena.getEveryone();
         ArrayList<String> playersList = new ArrayList<>();
         for (ArenaPlayer player: players){
             // print check
-            System.out.println(player.getName());
             playersList.add(player.getName());
         }
 

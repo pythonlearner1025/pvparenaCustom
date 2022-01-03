@@ -352,7 +352,9 @@ public class PlayerListener implements Listener {
             }
         }
     }
-
+// mjsong code injection point: objectives --> 
+    
+    // on death, transfer the kill item to the new player
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerDeath(final PlayerDeathEvent event) {
         final Player player = event.getEntity();

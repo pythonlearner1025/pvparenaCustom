@@ -90,6 +90,12 @@ public class Arena {
     private int startCount;
     private int round;
 
+    // mjsong21 pot object
+    private int entranceFee;
+    private int pot;
+    private boolean potInit;
+    private String potOwner;
+
     // Runnable IDs
     public BukkitRunnable endRunner;
     public BukkitRunnable pvpRunner;
@@ -106,6 +112,14 @@ public class Arena {
 
     public Arena(final String name) {
         this.name = name;
+
+        // mjsong code
+        this.entranceFee = 0;
+        this.pot = 0;
+        this.potInit = false;
+        this.potOwner = null;
+
+        // end mjsong code
 
         getDebugger().i("loading Arena " + name);
         final File file = new File(PVPArena.instance.getDataFolder().getPath()
@@ -137,6 +151,45 @@ public class Arena {
             }
         }
     }
+
+    // mjsong add to pot
+
+
+    public void incrementPot(int fee){
+        pot += fee;
+    }
+
+    public int getPot(){
+        return pot;
+    }
+
+    public int getEntranceFee(){
+        return entranceFee;
+    }
+
+    public String getPotOwner(){
+        return potOwner;
+    }
+
+    // set entrance fee via command
+    public void setEntranceFee(int fee){
+        entranceFee = fee;
+    }
+
+    // set potOwner to A) first player B) whoever kills the pot-owner if potowner != null
+    public void setPotOwner(String player){
+        potOwner = player;
+    }
+
+    public void setPot(int newPot) {
+        if (!potInit){
+            pot = newPot;
+            potInit = true;
+        }
+    }
+
+
+    // mjsong code end
 
     /**
      * Backwards compatible offhand-less implementation of the addClass method
@@ -666,6 +719,12 @@ public class Arena {
         final Random rRandom = new Random();
 
         final PAWinEvent dEvent = new PAWinEvent(this, player, items);
+        String msg = "pot winner:" + potOwner;
+        System.out.println(msg);
+        System.out.println("jackpot size:" + pot);
+        // mjsong code:
+        // if this is what is called when winEven happens, mark this player as the winning
+        // player.
         Bukkit.getPluginManager().callEvent(dEvent);
         items = dEvent.getItems();
 

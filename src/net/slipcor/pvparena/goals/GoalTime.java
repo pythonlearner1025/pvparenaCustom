@@ -70,6 +70,20 @@ public class GoalTime extends ArenaGoal {
         }
     }
 
+
+    // mjsong21 code
+    // call TimedEndRunnable to increment the time of its superclass, ArenaRunnable
+
+    public void safelyIncTime(int time){
+        if (ter == null){
+            return;
+        }
+        ter.incrementTime(time);
+        System.out.println(time + "seconds added to time!");
+    }
+
+    // mjsong21 code end
+
     @Override
     public void reset(final boolean force) {
         if (ter != null) {

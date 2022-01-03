@@ -1,6 +1,7 @@
 package net.slipcor.pvparena.classes;
 
 import net.slipcor.pvparena.PVPArena;
+import net.slipcor.pvparena.api.ServerListener;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.arena.ArenaPlayer.Status;
@@ -13,6 +14,7 @@ import net.slipcor.pvparena.core.Language;
 import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.events.PAJoinEvent;
 import net.slipcor.pvparena.events.PAStartEvent;
+import net.slipcor.pvparena.goals.GoalTime;
 import net.slipcor.pvparena.loadables.ArenaGoal;
 import net.slipcor.pvparena.loadables.ArenaModule;
 import net.slipcor.pvparena.loadables.ArenaModuleManager;
@@ -34,10 +36,7 @@ import org.bukkit.event.Cancellable;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 
 // mjsong21 import: import TransactionInit to create new transaction obj
@@ -205,6 +204,13 @@ public class PACheck {
         }
 
         arena.getDebugger().i("committing end: " + commit.getName());
+
+        // mjsong code
+        // tentative code: get the last potOwner at end and send that info to db
+
+        String finalPotOwner = arena.getPotOwner();
+        System.out.println("handling end event");
+        System.out.println("final winner:" + finalPotOwner);
         commit.commitEnd(force);
         return true;
     }
@@ -272,6 +278,9 @@ public class PACheck {
         commit.commitInteract(player, clickedBlock);
     }
 
+
+    // mjson objective: check if player is eligible to join
+    // the arena (has enough money)
     public static boolean handleJoin(final Arena arena,
                                   final CommandSender sender, final String[] args) {
         arena.getDebugger().i("handleJoin!");
@@ -343,7 +352,11 @@ public class PACheck {
         if (args.length < 1) {
             // usage: /pa {arenaname} join | join an arena
 
+            // player did not specify team, calc free team to assign player
+            // team == team player will join
             team = arena.getTeam(TeamManager.calcFreeTeam(arena));
+
+            // team player inputted in args[0] does not exist
         } else if(arena.getTeam(args[0]) == null) {
             arena.msg(sender, Language.parse(arena, MSG.ERROR_TEAMNOTFOUND, args[0]));
             return false;
@@ -353,13 +366,16 @@ public class PACheck {
             int maxPlayers = arena.getArenaConfig().getInt(CFG.READY_MAXPLAYERS);
             int maxTeamPlayers = arena.getArenaConfig().getInt(CFG.READY_MAXTEAMPLAYERS);
 
+            // arena full, return false
             if (maxPlayers > 0 && arena.getFighters().size() > maxPlayers) {
                 arena.msg(sender, Language.parse(arena, MSG.ERROR_JOIN_ARENA_FULL));
                 return false;
+            // team full, return false
             } else if (maxTeamPlayers > 0 && aTeam.getTeamMembers().size() > maxTeamPlayers) {
                 arena.msg(sender, Language.parse(arena, MSG.ERROR_JOIN_TEAM_FULL, aTeam.getColoredName()));
                 return false;
             } else {
+                // get team player specified in args[0]
                 team = aTeam;
             }
         }
@@ -369,6 +385,8 @@ public class PACheck {
             return false;
         }
 
+
+        // player --> sender of join req command (/join )
         final ArenaPlayer player = ArenaPlayer.parsePlayer(sender.getName());
 
         ArenaModuleManager.choosePlayerTeam(arena, (Player) sender,
@@ -379,6 +397,7 @@ public class PACheck {
         player.setPublicChatting(!arena.getArenaConfig().getBoolean(
                 CFG.CHAT_DEFAULTTEAM));
 
+        // cancel join is goal DNE
         if (commModule == null || commGoal == null) {
 
             if (commModule != null) {
@@ -414,6 +433,23 @@ public class PACheck {
                 return false;
             }
 
+
+            // mjsong code:
+            // check if player balance is sufficient with server:
+
+            ServerListener conn = new ServerListener();
+            if (arena.getEntranceFee() == 0){
+                throw new RuntimeException("cannt join: the admin must set an entrance fee");
+            }
+            String data = "name:" + sender.getName() + ", entrance fee:" + arena.getEntranceFee();
+            conn.sendRequest(data);
+
+
+            // broadcast join message
+            // mjsong observation:
+            // at this point, checked that goals exist in arena,
+            // and that team player is attempting to join is valid.
+
             if (arena.isFreeForAll()) {
                 arena.msg(sender,
                         arena.getArenaConfig().getString(CFG.MSG_YOUJOINED));
@@ -441,7 +477,11 @@ public class PACheck {
             PVPArena.instance.getAgm().initiate(arena, (Player) sender);
             ArenaModuleManager.initiate(arena, (Player) sender);
 
-            if (arena.getFighters().size() > 1
+            // mjsong
+
+            // has to be larger than 1? Can I change to >=1 and have min issues?
+            // dev jan 1: changed from > 1 to >= 1
+            if (arena.getFighters().size() >= 1
                     && arena.getFighters().size() >= arena.getArenaConfig()
                     .getInt(CFG.READY_MINPLAYERS)) {
                 arena.setFightInProgress(true);
@@ -451,6 +491,13 @@ public class PACheck {
 
                 for (final ArenaGoal goal : arena.getGoals()) {
                     goal.parseStart();
+
+                    // mjsong code
+                    if (goal instanceof GoalTime){
+                        // try inc time by 30 seconds per player join.
+                        ((GoalTime) goal).safelyIncTime(30);
+                    }
+                    //
                 }
 
                 for (final ArenaModule mod : arena.getMods()) {
@@ -521,8 +568,19 @@ public class PACheck {
                 arena.getArenaConfig().getBoolean(CFG.USES_DEATHMESSAGESCUSTOM)) {
             event.setDeathMessage("");
         }
-
+        // mjsong code
+        // modifications for player
+        // give killer the pot ownership
         if (player.getKiller() != null) {
+            // check if player was the pot owner
+            // if player was the pot owner, new potOwner = player.getKiller()
+
+            if (arena.getPotOwner().equals(player.getName())){
+                arena.setPotOwner(player.getKiller().getName());
+            }
+
+            //
+
             player.getKiller().setFoodLevel(
                     player.getKiller().getFoodLevel()
                             + arena.getArenaConfig().getInt(
@@ -783,12 +841,43 @@ public class PACheck {
             return null;
         }
 
-        final PAStartEvent event = new PAStartEvent(arena);
-        // mjsong21 code: call Api to init new game_session
+
+        // mjsong21
+
+        // below is the original position of event declaration. I modified to add it below after
+        // appending potOwner to arena.
+        // final PAStartEvent event = new PAStartEvent(arena);
+
+        // comm to db mechanics
+        // call Api to init new game_session
         TransactionInit newTransaction = new TransactionInit(arena);
         JSONObject json = newTransaction.getNewTransaction();
         System.out.println(json.toString());
-        //
+
+        // Bargo mechanics
+
+        // check if potAmount, and entranceFee has been set
+        if (arena.getEntranceFee() == 0) {
+            throw new RuntimeException("entrance fee not set");
+        }
+        // set the first player who joined the arena to be the potOwner
+        Set<ArenaPlayer> fighters = arena.getFighters();
+
+        Iterator<ArenaPlayer> iterator = fighters.iterator();
+        if (!iterator.hasNext()){
+            throw new RuntimeException("No fighters: expected 1, got 0");
+        }
+        ArenaPlayer firstPlayer = iterator.next();
+        // assign potOwner if first player to join arena && is fighter.
+        arena.setPotOwner(firstPlayer.getName());
+        System.out.println("set pot owner to:" + firstPlayer.getName());
+
+        // for now, ignore extra fighters. Only the first out of the set
+        // which is randomly ordered are set as pot owner
+
+        // mjsong21 code end
+
+        final PAStartEvent event = new PAStartEvent(arena);
 
         Bukkit.getPluginManager().callEvent(event);
         if (!force && event.isCancelled()) {

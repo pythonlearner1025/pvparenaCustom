@@ -21,6 +21,9 @@ import java.util.List;
  * @version v0.9.1
  */
 
+
+// to-do PAWinEvent --> give winning player POT
+
 public class PAWinEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
     private final Arena arena;
