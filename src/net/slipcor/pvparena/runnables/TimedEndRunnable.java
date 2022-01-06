@@ -2,10 +2,15 @@ package net.slipcor.pvparena.runnables;
 
 import net.slipcor.pvparena.PVPArena;
 import net.slipcor.pvparena.arena.Arena;
+import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.events.PAGoalEvent;
 import net.slipcor.pvparena.goals.GoalTime;
+import net.slipcor.pvparena.loadables.ArenaModuleManager;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+
+import java.util.Set;
 
 /**
  * <pre>Arena Runnable class "TimedEnd"</pre>

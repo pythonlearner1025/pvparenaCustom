@@ -149,6 +149,8 @@ public class BattlefieldJoin extends ArenaModule {
 
             @Override
             public void run() {
+
+                System.out.println("battleFieldJoin's commitJoin called, calling PACheck's handlestart");
                 Boolean check = PACheck.handleStart(arena, sender, true);
                 if (check == null || !check) {
                     Bukkit.getScheduler().runTaskLater(PVPArena.instance, this, 10L);

@@ -1,6 +1,7 @@
 package net.slipcor.pvparena.commands;
 
 import net.slipcor.pvparena.PVPArena;
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.classes.PACheck;
@@ -50,6 +51,17 @@ public class PAG_Join extends AbstractArenaCommand {
             return;
         }
 
+        // mjsong code
+        ServerClient conn = new ServerClient();
+        if (arena.getEntranceFee() == 0){
+            throw new RuntimeException("cannt join: the admin must set an entrance fee");
+        }
+        String data = "name:" + sender.getName() + ", entrance fee:" + arena.getEntranceFee();
+        conn.sendRequest(data);
+        System.out.println("pot size: " + arena.getPot());
+        System.out.println("fee size: " + arena.getEntranceFee());
+
+
 
         // mjsong try
         // set CFG.JOININBATTLE to true, will this work?
@@ -90,6 +102,7 @@ public class PAG_Join extends AbstractArenaCommand {
                 arena.getDebugger().i("Join_2", sender);
                 arena.msg(sender, Language.parse(arena, MSG.ERROR_ARENA_ALREADY_PART_OF, ArenaManager.getIndirectArenaName(arena)));
             } else {
+                System.out.println("handleJoin late player");
                 PACheck.handleJoin(arena, sender, args);
             }
         } else {

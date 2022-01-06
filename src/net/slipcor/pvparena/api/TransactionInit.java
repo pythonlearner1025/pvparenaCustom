@@ -38,6 +38,9 @@ import net.slipcor.pvparena.arena.ArenaPlayer;
 
     
 
+// make this into Smart Contract INIT,
+// send necessary info to instantiate a fresh smart contract
+// IMPORTANT: new smart contract instance per game instance
 
  -
  */
@@ -77,8 +80,8 @@ public class TransactionInit {
         for (String player: playersList){
             jsonPlayersList.add(player);
         }
-        this.newTransaction.put("players", jsonPlayersList);
-        this.newTransaction.put("goals", jsonGoalList);
+        newTransaction.put("players", jsonPlayersList);
+        newTransaction.put("goals", jsonGoalList);
 
     }
 

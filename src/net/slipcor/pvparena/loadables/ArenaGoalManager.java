@@ -1,6 +1,7 @@
 package net.slipcor.pvparena.loadables;
 
 import net.slipcor.pvparena.PVPArena;
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.arena.ArenaPlayer.Status;
@@ -20,6 +21,8 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
 import java.io.File;
 import java.util.*;
@@ -247,12 +250,6 @@ public class ArenaGoalManager {
 
     public void timedEnd(final Arena arena) {
 
-        /*
-          name/team => score points
-
-          handed over to each module
-         */
-
         arena.getDebugger().i("timed end!");
 
         Map<String, Double> scores = new HashMap<>();
@@ -262,13 +259,17 @@ public class ArenaGoalManager {
             scores = type.timedEnd(scores);
         }
 
-        final Set<String> winners = new HashSet<>();
 
+
+        //mjsong conjectureL: in my damn opinion, the below can be zapped
+        /*
         if (arena.isFreeForAll() && arena.getTeams().size() <= 1) {
             winners.add("free");
             arena.getDebugger().i("adding FREE");
         } else if ("none".equals(arena.getArenaConfig().getString(CFG.GOAL_TIME_WINNER))) {
             // check all teams
+
+
             double maxScore = 0;
 
             int neededTeams = arena.getTeams().size();
@@ -348,6 +349,8 @@ public class ArenaGoalManager {
             }
         }
 
+
+
         if (arena.isFreeForAll() && arena.getTeams().size() <= 1) {
             arena.getDebugger().i("FFAAA");
             final Set<String> preciseWinners = new HashSet<>();
@@ -383,15 +386,19 @@ public class ArenaGoalManager {
             }
         }
 
+             */
+
+        final Set<String> winners = new HashSet<>();
         ArenaModuleManager.timedEnd(arena, winners);
 
+
+        // mjson opinion:
+        // below useless too
+        /*
         if (arena.isFreeForAll() && arena.getTeams().size() <= 1) {
             arena.getDebugger().i("FFA and <= 1!");
             for (final ArenaTeam team : arena.getTeams()) {
-                final Set<ArenaPlayer> apSet = new HashSet<>();
-                for (final ArenaPlayer p : team.getTeamMembers()) {
-                    apSet.add(p);
-                }
+                final Set<ArenaPlayer> apSet = new HashSet<>(team.getTeamMembers());
 
                 for (final ArenaPlayer p : apSet) {
                     if (winners.isEmpty()) {
@@ -416,12 +423,40 @@ public class ArenaGoalManager {
                     }
                 }
             }
-            if (winners.isEmpty()) {
-                ArenaModuleManager.announce(arena,
-                        Language.parse(arena, MSG.FIGHT_DRAW), "WINNER");
-                arena.broadcast(Language.parse(arena, MSG.FIGHT_DRAW));
-            }
-        } else if (!winners.isEmpty()) {
+
+         */
+            // mjsong injection:
+            // will always be the case, because players will not lose based on lack of lives.
+
+
+        ArenaModuleManager.announce(arena,
+               "mjson msg: game has concluded!", "WINNER");
+
+
+        JSONObject end = new JSONObject();
+        JSONArray playedPlayers = new JSONArray();
+
+        Set<ArenaPlayer> players = arena.getFighters();
+        for (final ArenaPlayer ap: players){
+            playedPlayers.add(ap.getName());
+            arena.broadcast(ap.getName() + " won " + ap.getBal());
+            arena.broadcast("pot winner: " + arena.getPotOwner());
+            ap.setBal(0);
+        }
+        end.put("players to keep rewards:", playedPlayers);
+
+        ServerClient conn = new ServerClient();
+        try {
+            conn.commitSC(end);
+            System.out.println("http send success, at least on client side. check server");
+        } catch (Exception e){
+            System.out.println(e);
+        }
+
+
+        // mjsong change: try removing all below, if it works, del
+         /*
+        else if (!winners.isEmpty()) {
 
             boolean hasBroadcasted = false;
             for (final ArenaTeam team : arena.getTeams()) {
@@ -474,13 +509,13 @@ public class ArenaGoalManager {
             arena.reset(true);
             return;
         }
+
+          */
         /*
 		 * for (ArenaPlayer player : arena.getEveryone()) { if
 		 * (player.getStatus() == Status.FIGHT) { player.setStatus(Status.LOST);
 		 * } }
 		 */
-        arena.getDebugger().i("resetting arena!");
-
         arena.reset(false); // TODO: try to establish round compatibility with
         // new EndRunnable();
     }

@@ -470,14 +470,24 @@ public final class SpawnManager {
 
     private static void placeInsideSpawnRegion(final Arena arena, final ArenaPlayer aPlayer,
                                                final ArenaRegion region) {
+
+        // mjsong scenario: considering the case where the region is optionally LOUNGE,
+        // sending dead player with available respawns to LOUNGE instead of immediate respawn
+        // without verificaiton of legal join bal
+
         int x, y, z;
         final Random random = new Random();
 
         boolean found = false;
         int attempt = 0;
 
-        PABlockLocation loc = null;
+        // disable this
+        //PABlockLocation loc = null;
 
+        // mjsong try:
+        // if this works, all lounge spawns must specifically be set to be "lounge", for now
+
+        /*
         while (!found && attempt < 10) {
 
             x = region.getShape().getMinimumLocation().getX() + random.nextInt(region.getShape().getMaximumLocation().getX() -
@@ -494,14 +504,19 @@ public final class SpawnManager {
 
         }
 
-        final PABlockLocation newLoc = loc;
+         */
+
+        //final PABlockLocation newLoc = loc;
 
         class RunLater implements Runnable {
             @Override
             public void run() {
                 final PALocation temp = aPlayer.getSavedLocation();
 
+                /*
+
                 Location bLoc = newLoc.toLocation();
+
                 bLoc = bLoc.add(
                         PVPArena.instance.getConfig().getDouble("x-offset", 0.5),
                         PVPArena.instance.getConfig().getDouble("y-offset", 0.5),
@@ -513,15 +528,20 @@ public final class SpawnManager {
                     bLoc = bLoc.add(0, 1, 0);
                 }
 
-                arena.getDebugger().i("bLoc: " + bLoc.toString());
-                aPlayer.setLocation(new PALocation(bLoc));
+                 */
 
-                aPlayer.setStatus(Status.FIGHT);
+                PALocation bLoc = getSpawnByExactName(arena, "lounge");
+                //aPlayer.setLocation(new PALocation(bLoc));
+                aPlayer.setLocation(bLoc);
+
+                // mjsong hardcode: change Status to LOUNGE
+                aPlayer.setStatus(Status.LOUNGE);
 
                 arena.tpPlayerToCoordName(aPlayer, "old");
                 Bukkit.getScheduler().runTaskLater(PVPArena.instance, new Runnable() {
                             @Override
                             public void run() {
+                                // wtf does temp do? can it be removed?
                                 aPlayer.setLocation(temp);
                                 arena.getDebugger().i("temp: " + temp.toString());
                             }
@@ -539,14 +559,17 @@ public final class SpawnManager {
                                                 final Set<ArenaRegion> ars) {
         if (arena.isFreeForAll()) {
             for (final ArenaPlayer ap : set) {
+
+
+
                 int pos = new Random().nextInt(ars.size());
 
                 for (final ArenaRegion x : ars) {
                     if (pos-- == 0) {
-                        placeInsideSpawnRegion(arena, ap, x);
                         break;
                     }
                 }
+
             }
         } else {
             String teamName = null;
@@ -615,7 +638,8 @@ public final class SpawnManager {
         return false;
     }
 
-    public static void respawn(final Arena arena, final ArenaPlayer aPlayer, final String overrideSpawn) {
+    // respawn players in FFA to lounge, by setting option to arena.getRegionsByType(RegionType.LOUNGE)
+    public static void respawn(final Arena arena, final ArenaPlayer aPlayer, final String overrideSpawn, final RegionType option) {
 
         if (arena == null) {
             PVPArena.instance.getLogger().warning("Arena is null for player " + aPlayer + " while respawning!");
@@ -646,12 +670,27 @@ public final class SpawnManager {
                 return;
             }
 
+
+            // mjsong injection
+            //  if option exists,
+            //  re-spawn them in LOUNGE area and configure them appropriately
+
+            if (option == RegionType.LOUNGE){
+                // do something
+                Set<ArenaRegion> ars = arena.getRegionsByType(option);
+                Iterator<ArenaRegion> arenaIterator = ars.iterator();
+                ArenaRegion region = arenaIterator.next();
+                placeInsideSpawnRegion(arena, aPlayer,region);
+                return;
+            }
+            // end injection
+
+
             final Set<ArenaRegion> ars = arena.getRegionsByType(RegionType.SPAWN);
             if (!ars.isEmpty()) {
                 final Set<ArenaPlayer> team = new HashSet<>();
                 team.add(aPlayer);
                 placeInsideSpawnRegions(arena, team, ars);
-
                 return;
             }
             if (arena.isFreeForAll()) {

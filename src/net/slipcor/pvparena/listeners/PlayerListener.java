@@ -1,6 +1,7 @@
 package net.slipcor.pvparena.listeners;
 
 import net.slipcor.pvparena.PVPArena;
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.arena.ArenaPlayer.Status;
@@ -43,6 +44,7 @@ import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.IllegalPluginAccessException;
+import org.json.simple.JSONObject;
 
 import java.util.*;
 
@@ -513,9 +515,19 @@ public class PlayerListener implements Listener {
         arena.getDebugger().i("event post cancelled: " + event.isCancelled(),
                 player);
 
+        //mjsong conjecture: whyMe is true, because even one goal that does not allow
+        // join in battle returns true for .allowsJoinInBattle
+
+        // try setting whyMe to false.
+
+        /*
         //TODO: seriously, why?
         final boolean whyMe = arena.isFightInProgress()
                 && !PVPArena.instance.getAgm().allowsJoinInBattle(arena);
+        */
+
+        final boolean whyMe = false;
+        // end of conjecture
 
         final ArenaPlayer aPlayer = ArenaPlayer.parsePlayer(player.getName());
         final ArenaTeam team = aPlayer.getArenaTeam();
@@ -527,9 +539,12 @@ public class PlayerListener implements Listener {
         }
 
         if (aPlayer.getStatus() != Status.FIGHT) {
+
+            /*
             if (whyMe) {
                 arena.getDebugger().i("exiting! fight in progress AND no INBATTLEJOIN arena!", player); return;
             }
+            */
             if (asList(Status.LOUNGE, Status.READY).contains(aPlayer.getStatus()) &&
                     arena.getArenaConfig().getBoolean(CFG.PERMS_LOUNGEINTERACT)) {
                 arena.getDebugger().i("allowing lounge interaction due to config setting!");
@@ -570,17 +585,22 @@ public class PlayerListener implements Listener {
                             player);
                     arena.getDebugger().i(String.valueOf(team), player);
 
+                    /*
                     if (whyMe) {
                         arena.getDebugger().i("exiting! fight in progress AND no INBATTLEJOIN arena!", player);
                     }
+
+                     */
                 }
                 return;
             }
-
+            /*
             if (whyMe) {
                 arena.getDebugger().i("exiting! fight in progress AND no INBATTLEJOIN arena!", player);
                 return;
             }
+
+             */
             arena.getDebugger().i("block click!", player);
 
             final Material mMat = arena.getReadyBlock();
@@ -602,6 +622,7 @@ public class PlayerListener implements Listener {
                 if (aPlayer.getStatus() != Status.LOUNGE && aPlayer.getStatus() != Status.READY) {
                     return;
                 }
+                System.out.println("should not enter here");
                 event.setCancelled(true);
                 arena.getDebugger().i("Cancelled ready block click event to prevent itemstack consumation");
                 Bukkit.getScheduler().runTaskLater(PVPArena.instance, new Runnable() {
@@ -617,6 +638,7 @@ public class PlayerListener implements Listener {
                 arena.getDebugger().i("===============", player);
 
                 if (!arena.isFightInProgress()) {
+                    System.out.println("fight not in progress!");
                     if (aPlayer.getStatus() != Status.READY) {
                         arena.msg(player, Language.parse(arena, MSG.READY_DONE));
                         if (!alreadyReady) {
@@ -645,15 +667,113 @@ public class PlayerListener implements Listener {
 
                     final String error = arena.ready();
 
+
+                    // mjsong major edit
+                    // player entrance legibility check: must communicate with external databse...
+
                     if (error == null) {
+                        // this is how the arena starts on iron-block touch.
+                        // mjsong TODO:
+                        JSONObject entrance = new JSONObject();
+                        JSONObject feeDetails = new JSONObject();
+                        feeDetails.put("requesting player", aPlayer.getName());
+                        feeDetails.put("entrancefee", arena.getEntranceFee());
+                        entrance.put("entrance request",feeDetails);
+                        ServerClient conn = new ServerClient();
+                        try {
+                            conn.playerEnterSC(entrance);
+                            System.out.println("http send success, at least on client side. check server");
+                        } catch (Exception e){
+                            System.out.println(e);
+                        }
+
+                        // first check player balance >= entranceFee
+                        // then allow join, and inc pot
+                        aPlayer.incBal(arena.getEntranceFee());
+
+                        arena.incrementPot(arena.getEntranceFee());
+                        String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+
+                        final Set<ArenaPlayer> players = arena.getFighters();
+                        for (final ArenaPlayer ap : players) {
+                            if (ap.get() != null) {
+                                if (ap.getName().equals(aPlayer.getName())){
+                                    arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
+                                } else {
+                                    arena.msg(ap.get(), balIncMsg);
+                                }
+                            }
+                        }
+                        // disable for now
+                        /*
+                        arena.incrementPot(arena.getEntranceFee());
+                        String potIncMsg = "new Pot Size:" + arena.getPot();
+
+                        final Set<ArenaPlayer> players = arena.getFighters();
+                        for (final ArenaPlayer ap : players) {
+                            if (ap.get() != null) {
+                                arena.msg(ap.get(), potIncMsg);
+                            }
+                        }
+
+                         */
                         arena.start();
+                        return;
                     } else if (error.isEmpty()) {
                         arena.countDown();
+                        return;
                     } else {
                         arena.msg(player, error);
+                        return;
                     }
-                    return;
                 }
+
+                // check player eligibility
+                // mjsong TODO:
+                System.out.println("CHECKING ENTRANCE OF PLAYER WHILE FIGHT IN PROGRESS!!");
+                JSONObject entrance = new JSONObject();
+                JSONObject feeDetails = new JSONObject();
+                feeDetails.put("requesting player", aPlayer.getName());
+                feeDetails.put("entrancefee", arena.getEntranceFee());
+                entrance.put("entrance request",feeDetails);
+                ServerClient conn = new ServerClient();
+                try {
+                    conn.playerEnterSC(entrance);
+                    System.out.println("http send success, at least on client side. check server");
+                } catch (Exception e){
+                    System.out.println(e);
+                }
+                // inc playerBal
+
+                aPlayer.incBal(arena.getEntranceFee());
+
+                arena.incrementPot(arena.getEntranceFee());
+                String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+
+                final Set<ArenaPlayer> players = arena.getFighters();
+                for (final ArenaPlayer ap : players) {
+                    if (ap.get() != null) {
+                        if (ap.getName().equals(aPlayer.getName())){
+                            arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
+                        } else {
+                            arena.msg(ap.get(), balIncMsg);
+                        }
+                    }
+                }
+
+                // disable pot mode for now
+                /*
+                // inc pot (All players will be called by this after first player
+                // touches IRON BLOCK and calls arena.start() at line 687
+                arena.incrementPot(arena.getEntranceFee());
+                String potIncMsg = "new Pot Size:" + arena.getPot();
+
+                for (final ArenaPlayer ap : players) {
+                    if (ap.get() != null) {
+                        arena.msg(ap.get(), potIncMsg);
+                    }
+                }
+                 */
 
                 final Set<PASpawn> spawns = new HashSet<>();
                 if (arena.getArenaConfig().getBoolean(CFG.GENERAL_CLASSSPAWN)) {
@@ -674,16 +794,25 @@ public class PlayerListener implements Listener {
                 for (final PASpawn spawn : spawns) {
 
                     if (--pos < 0) {
+                        System.out.println("executed tp");
+
                         arena.tpPlayerToCoordName(aPlayer, spawn.getName());
                         break;
                     }
                 }
 
+
+                // mjsong observation;
+                // this is where player status set to FIGHT on iron block click
+
                 ArenaPlayer.parsePlayer(player.getName()).setStatus(
                         Status.FIGHT);
-
                 ArenaModuleManager.lateJoin(arena, player);
                 ArenaGoalManager.lateJoin(arena, player);
+
+                // this is where sums would be subtracted
+
+
             } else if (block.getType() == Material.CHEST || block.getType() == Material.TRAPPED_CHEST) {
                 arena = ArenaManager.getArenaByRegionLocation(new PABlockLocation(block.getLocation()));
                 if (arena != null) {

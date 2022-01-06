@@ -719,12 +719,17 @@ public class Arena {
         final Random rRandom = new Random();
 
         final PAWinEvent dEvent = new PAWinEvent(this, player, items);
-        String msg = "pot winner:" + potOwner;
-        System.out.println(msg);
-        System.out.println("jackpot size:" + pot);
+
+
+        // mjsong code
+        // iterate through all players in the arena and announce how much
+        // balance they had at game end
+        //Set<ArenaPlayer> fighters = this.getFighters();
+
         // mjsong code:
         // if this is what is called when winEven happens, mark this player as the winning
         // player.
+
         Bukkit.getPluginManager().callEvent(dEvent);
         items = dEvent.getItems();
 
@@ -1060,7 +1065,10 @@ public class Arena {
 
         final int players = TeamManager.countPlayersInTeams(this);
         if (players < 2) {
-            return Language.parse(this, MSG.ERROR_READY_1_ALONE);
+            // mjsong21 edit
+            // change the commented below, now returns null
+            //return Language.parse(this, MSG.ERROR_READY_1_ALONE);
+            return null;
         }
         if (players < cfg.getInt(CFG.READY_MINPLAYERS)) {
             return Language.parse(this, MSG.ERROR_READY_4_MISSING_PLAYERS);
@@ -1441,6 +1449,15 @@ public class Arena {
             public void run() {
                 for (final ArenaPlayer ap : players) {
                     debug.i("Giving rewards to " + ap.get().getName() + '!');
+                    // mjsong injection (rewards)
+                    // just announce bal here for now
+
+                    for (final ArenaPlayer op: players){
+                        msg(ap.get(), op.getName() + " won " + "$" + op.getBal());
+                    }
+
+                    // announcement end
+
                     try {
                         giveRewards(ap.get());
                     } catch (final Exception e) {
@@ -1456,6 +1473,8 @@ public class Arena {
     /**
      * reset an arena
      */
+
+    // force used to reset player
     public void reset(final boolean force) {
 
         final PAEndEvent event = new PAEndEvent(this);
@@ -1467,6 +1486,15 @@ public class Arena {
         }
         signs.clear();
         playedPlayers.clear();
+
+        // mjsong inject
+        // if this is called when arena reset, re-set representative values
+        // (representative values) == on-chain equivalents for visual purposes
+
+        pot = 0;
+
+
+        //
         resetPlayers(force);
         setFightInProgress(false);
 
@@ -1885,6 +1913,8 @@ public class Arena {
         }
         gaveRewards = false;
         startRunner = null;
+
+        // whats being called when /start called once in arena
         if (fightInProgress) {
             getDebugger().i("already in progress! OUT!");
             return;
@@ -1904,7 +1934,9 @@ public class Arena {
         getDebugger().i("sum == " + sum);
         final String errror = ready();
 
-        boolean overRide = false;
+
+        // mjsong edit: set overRide to true
+        boolean overRide = true;
 
         if (forceStart) {
             overRide = errror == null ||
@@ -1914,38 +1946,18 @@ public class Arena {
                     errror.contains(Language.parse(MSG.ERROR_READY_4_MISSING_PLAYERS));
         }
 
-        if (overRide || errror == null || errror.isEmpty()) {
+        if (overRide) {
             final Boolean handle = PACheck.handleStart(this, null, forceStart);
 
-            if (overRide || handle) {
-                getDebugger().i("START!");
-                setFightInProgress(true);
 
-                if (getArenaConfig().getBoolean(CFG.USES_SCOREBOARD)) {
-                    Objective obj = getSpecialScoreboard().getObjective("lives");
-                    obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-                }
+            getDebugger().i("START!");
+            setFightInProgress(true);
 
-            } else if (handle) {
-                if (errror != null) {
-                    PVPArena.instance.getLogger().info(errror);
-                }
-				/*
-				for (ArenaPlayer ap : getFighters()) {
-					getDebugger().i("removing player " + ap.getName());
-					playerLeave(ap.get(), CFG.TP_EXIT, false);
-				}
-				reset(false);*/
-            } else {
-
-                // false
-                PVPArena.instance.getLogger().info("START aborted by event cancel");
-                //reset(true);
+            if (getArenaConfig().getBoolean(CFG.USES_SCOREBOARD)) {
+                Objective obj = getSpecialScoreboard().getObjective("lives");
+                assert obj != null;
+                obj.setDisplaySlot(DisplaySlot.SIDEBAR);
             }
-        } else {
-            // false
-            broadcast(Language.parse(MSG.ERROR_ERROR, errror));
-            //reset(true);
         }
     }
 
@@ -1964,6 +1976,8 @@ public class Arena {
      * @param color  the color to use
      * @param player the player to prefix
      */
+
+    // mjsong delete
     public void tellTeam(final String sTeam, final String msg, final ChatColor color,
                          final Player player) {
         final ArenaTeam team = getTeam(sTeam);
@@ -2120,6 +2134,8 @@ public class Arena {
      * @param team   the arena team to put into
      * @return true if joining successful
      */
+
+    // mjsong delete
     public boolean tryJoin(final Player player, final ArenaTeam team) {
         final ArenaPlayer aPlayer = ArenaPlayer.parsePlayer(player.getName());
 

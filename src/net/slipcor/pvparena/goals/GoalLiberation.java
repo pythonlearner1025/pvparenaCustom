@@ -15,6 +15,7 @@ import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.events.PAGoalEvent;
 import net.slipcor.pvparena.loadables.ArenaGoal;
 import net.slipcor.pvparena.loadables.ArenaModuleManager;
+import net.slipcor.pvparena.loadables.ArenaRegion;
 import net.slipcor.pvparena.managers.InventoryManager;
 import net.slipcor.pvparena.managers.SpawnManager;
 import net.slipcor.pvparena.managers.TeamManager;
@@ -195,7 +196,7 @@ public class GoalLiberation extends ArenaGoal {
 
                 for (final ArenaPlayer jailedPlayer : pTeam.getTeamMembers()) {
                     if (jailedPlayer.getStatus() == Status.DEAD) {
-                        SpawnManager.respawn(arena, jailedPlayer, null);
+                        SpawnManager.respawn(arena, jailedPlayer, null, ArenaRegion.RegionType.SPAWN);
                         final List<ItemStack> iList = new ArrayList<>();
 
                         for (final ItemStack item : jailedPlayer.getArenaClass().getItems()) {

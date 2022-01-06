@@ -1,7 +1,7 @@
 package net.slipcor.pvparena.classes;
 
 import net.slipcor.pvparena.PVPArena;
-import net.slipcor.pvparena.api.ServerListener;
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.arena.ArenaPlayer.Status;
@@ -40,7 +40,6 @@ import java.util.*;
 
 
 // mjsong21 import: import TransactionInit to create new transaction obj
-import net.slipcor.pvparena.api.sendTransactionInit;
 
 import net.slipcor.pvparena.api.TransactionInit;
 import org.json.simple.JSONObject;
@@ -282,7 +281,7 @@ public class PACheck {
     // mjson objective: check if player is eligible to join
     // the arena (has enough money)
     public static boolean handleJoin(final Arena arena,
-                                  final CommandSender sender, final String[] args) {
+                                     final CommandSender sender, final String[] args) {
         arena.getDebugger().i("handleJoin!");
         int priority = 0;
         PACheck res = new PACheck();
@@ -293,7 +292,7 @@ public class PACheck {
             res = mod.checkJoin(sender, res, true);
             if (res.priority > priority && priority >= 0) {
                 // success and higher priority
-                arena.getDebugger().i("higher priority, commModule := "+mod.getName());
+                arena.getDebugger().i("higher priority, commModule := " + mod.getName());
                 priority = res.priority;
                 commModule = mod;
             } else if (res.priority < 0 || priority < 0) {
@@ -327,7 +326,7 @@ public class PACheck {
             res = mod.checkJoin(sender, res, args);
             if (res.priority > priority && priority >= 0) {
                 // success and higher priority
-                arena.getDebugger().i("higher priority, commGoal := "+mod.getName());
+                arena.getDebugger().i("higher priority, commGoal := " + mod.getName());
                 priority = res.priority;
                 commGoal = mod;
             } else if (res.priority < 0 || priority < 0) {
@@ -357,7 +356,7 @@ public class PACheck {
             team = arena.getTeam(TeamManager.calcFreeTeam(arena));
 
             // team player inputted in args[0] does not exist
-        } else if(arena.getTeam(args[0]) == null) {
+        } else if (arena.getTeam(args[0]) == null) {
             arena.msg(sender, Language.parse(arena, MSG.ERROR_TEAMNOTFOUND, args[0]));
             return false;
         } else {
@@ -370,7 +369,7 @@ public class PACheck {
             if (maxPlayers > 0 && arena.getFighters().size() > maxPlayers) {
                 arena.msg(sender, Language.parse(arena, MSG.ERROR_JOIN_ARENA_FULL));
                 return false;
-            // team full, return false
+                // team full, return false
             } else if (maxTeamPlayers > 0 && aTeam.getTeamMembers().size() > maxTeamPlayers) {
                 arena.msg(sender, Language.parse(arena, MSG.ERROR_JOIN_TEAM_FULL, aTeam.getColoredName()));
                 return false;
@@ -397,23 +396,30 @@ public class PACheck {
         player.setPublicChatting(!arena.getArenaConfig().getBoolean(
                 CFG.CHAT_DEFAULTTEAM));
 
-        // cancel join is goal DNE
-        if (commModule == null || commGoal == null) {
+        // mjsong edit: main method of join!
+        // late join being called
+        if (commModule != null) {
+            arena.getDebugger().i("calling event #1");
 
-            if (commModule != null) {
-                arena.getDebugger().i("calling event #1");
-
-                final PAJoinEvent event = new PAJoinEvent(arena, (Player) sender, false);
-                Bukkit.getPluginManager().callEvent(event);
-                if (event.isCancelled()) {
-                    arena.getDebugger().i("! Join event cancelled by plugin !");
-                    return false;
-                }
-                commModule.commitJoin((Player) sender, team);
-
-                ArenaModuleManager.parseJoin(arena, (Player) sender, team);
-                return true;
+            final PAJoinEvent event = new PAJoinEvent(arena, (Player) sender, false);
+            Bukkit.getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                arena.getDebugger().i("! Join event cancelled by plugin !");
+                return false;
             }
+            commModule.commitJoin((Player) sender, team);
+
+
+            // late lounge module
+            ArenaModuleManager.parseJoin(arena, (Player) sender, team);
+            System.out.println("entered and exited through this.");
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+            /*
             if (!ArenaManager.checkJoin((Player) sender, arena)) {
                 arena.msg(sender, Language.parse(arena, MSG.ERROR_JOIN_REGION));
                 return false;
@@ -429,49 +435,15 @@ public class PACheck {
                 return false;
             }
 
-            if (!arena.tryJoin((Player) sender, team)) {
-                return false;
-            }
+            arena.msg(sender,
+                    arena.getArenaConfig().getString(CFG.MSG_YOUJOINED));
+            arena.broadcastExcept(
+                    sender,
+                    Language.parse(arena, CFG.MSG_PLAYERJOINED,
+                            sender.getName()));
 
+            // arena is FFA
 
-            // mjsong code:
-            // check if player balance is sufficient with server:
-
-            ServerListener conn = new ServerListener();
-            if (arena.getEntranceFee() == 0){
-                throw new RuntimeException("cannt join: the admin must set an entrance fee");
-            }
-            String data = "name:" + sender.getName() + ", entrance fee:" + arena.getEntranceFee();
-            conn.sendRequest(data);
-
-
-            // broadcast join message
-            // mjsong observation:
-            // at this point, checked that goals exist in arena,
-            // and that team player is attempting to join is valid.
-
-            if (arena.isFreeForAll()) {
-                arena.msg(sender,
-                        arena.getArenaConfig().getString(CFG.MSG_YOUJOINED));
-                arena.broadcastExcept(
-                        sender,
-                        Language.parse(arena, CFG.MSG_PLAYERJOINED,
-                                sender.getName()));
-            } else {
-                arena.msg(
-                        sender,
-                        arena.getArenaConfig()
-                                .getString(CFG.MSG_YOUJOINEDTEAM)
-                                .replace(
-                                        "%1%",
-                                        team.getColoredName()
-                                                + ChatColor.COLOR_CHAR + 'r'));
-                arena.broadcastExcept(
-                        sender,
-                        Language.parse(arena, CFG.MSG_PLAYERJOINEDTEAM,
-                                sender.getName(), team.getColoredName()
-                                        + ChatColor.COLOR_CHAR + 'r'));
-            }
             ArenaModuleManager.parseJoin(arena, (Player) sender, team);
 
             PVPArena.instance.getAgm().initiate(arena, (Player) sender);
@@ -491,13 +463,6 @@ public class PACheck {
 
                 for (final ArenaGoal goal : arena.getGoals()) {
                     goal.parseStart();
-
-                    // mjsong code
-                    if (goal instanceof GoalTime){
-                        // try inc time by 30 seconds per player join.
-                        ((GoalTime) goal).safelyIncTime(30);
-                    }
-                    //
                 }
 
                 for (final ArenaModule mod : arena.getMods()) {
@@ -505,12 +470,23 @@ public class PACheck {
                 }
             }
 
+
+            // set player ready
             if (player.getArenaClass() != null && arena.startRunner != null) {
                 player.setStatus(Status.READY);
             }
 
             return true;
+        } else {
+            return false;
         }
+    }
+
+        // mjsong conjecture
+        // below was part of handleJoin
+        // below should be useless
+
+        /*
 
         arena.getDebugger().i("calling event #3");
 
@@ -531,9 +507,13 @@ public class PACheck {
         return true;
     }
 
+         */
+
+
+
+
     public static void handlePlayerDeath(final Arena arena,
                                          final Player player, final PlayerDeathEvent event) {
-
         int priority = 0;
         PACheck res = new PACheck();
 
@@ -571,15 +551,90 @@ public class PACheck {
         // mjsong code
         // modifications for player
         // give killer the pot ownership
+        Set<ArenaPlayer> players = arena.getFighters();
         if (player.getKiller() != null) {
             // check if player was the pot owner
             // if player was the pot owner, new potOwner = player.getKiller()
 
             if (arena.getPotOwner().equals(player.getName())){
                 arena.setPotOwner(player.getKiller().getName());
+
+                final int extraTime = 30;
+
+                for (ArenaGoal goal : arena.getGoals()) {
+                    // mjsong code
+                    System.out.println("expecting safelyIncTime: ... ");
+                    if (goal instanceof GoalTime){
+                        // try inc time by 30 seconds per player join.
+                        System.out.println("entered safelyIncTime");
+                        try {
+                            ((GoalTime) goal).safelyIncTime(extraTime);
+                        } catch (Exception e){
+                            System.out.println("failed to inc time: " + e);
+                        }
+                    }
+
+                }
+
+                // seperate from pot ownership: bal change by kill
+
+
+
+
+                // global msgs for players
+                final String killMsg = player.getKiller().getName() + " now owns the pot!";
+                final String timeMsg = extraTime + " seconds added to the clock!";
+
+                for (final ArenaPlayer ap : players) {
+                    if (ap.get() != null) {
+                        arena.msg(ap.get(), killMsg);
+                        arena.msg(ap.get(), timeMsg);
+                    }
+                }
+            }
+            ArenaPlayer victim = null;
+            ArenaPlayer killer = null;
+            for (ArenaPlayer aPlayer: players) {
+                if (aPlayer.getName().equals(player.getName())){
+                    victim = aPlayer;
+                }
+                else if (aPlayer.getName().equals(player.getKiller().getName())){
+                    killer = aPlayer;
+                }
             }
 
-            //
+            // really primitive way of exchaning value. Make this better.
+            // eventually connected to chain!
+            if (victim != null && killer != null){
+
+                // injection point for comm with server
+                JSONObject update = new JSONObject();
+                JSONObject victimJSON = new JSONObject();
+                victimJSON.put("oldBal", victim.getBal());
+                victimJSON.put("newBal", 0);
+                update.put("victim", victimJSON);
+
+                JSONObject killerJSON = new JSONObject();
+                killerJSON.put("oldBal", killer.getBal());
+                killerJSON.put("newBal", killer.getBal() + victim.getBal());
+                update.put("killer", killerJSON);
+
+                ServerClient conn = new ServerClient();
+                try {
+                    conn.playerUpdateSC(update);
+                    System.out.println("http send success, at least on client side. check server");
+                } catch (Exception e){
+                    System.out.println(e);
+                }
+
+                int booty = victim.getBal();
+                victim.setBal(0);
+                killer.incBal(booty);
+                final String victimMsg = killer.getName() + " looted you! new balance: " + victim.getBal();
+                final String killerMsg = "You looted " + victim.getName() + "'s booty! new balance: " + killer.getBal();
+                arena.msg(victim.get(), victimMsg);
+                arena.msg(killer.get(), killerMsg);
+            }
 
             player.getKiller().setFoodLevel(
                     player.getKiller().getFoodLevel()
@@ -601,7 +656,13 @@ public class PACheck {
                 }
             }
             if (arena.getArenaConfig().getBoolean(CFG.USES_TELEPORTONKILL)) {
-                SpawnManager.respawn(arena, ArenaPlayer.parsePlayer(player.getKiller().getName()), null);
+                // mjsong injection
+                RegionType option = RegionType.SPAWN;
+                if (arena.isFreeForAll()) {
+                    option = RegionType.LOUNGE;
+                }
+                // mjsong inject end
+                SpawnManager.respawn(arena, ArenaPlayer.parsePlayer(player.getKiller().getName()), null, option);
             }
         }
 
@@ -695,7 +756,14 @@ public class PACheck {
         }
         arena.getDebugger().i("handleRespawn!", aPlayer.getName());
         new InventoryRefillRunnable(arena, aPlayer.get(), drops);
-        SpawnManager.respawn(arena, aPlayer, null);
+
+        // mjsong injection
+        RegionType option = RegionType.SPAWN;
+        if (arena.isFreeForAll()) {
+            option = RegionType.LOUNGE;
+        }
+        // mjsong inject end
+        SpawnManager.respawn(arena, aPlayer, null, option);
         arena.unKillPlayer(aPlayer.get(),
                 aPlayer.get().getLastDamageCause() == null ? null : aPlayer
                         .get().getLastDamageCause().getCause(), aPlayer.get()
@@ -834,7 +902,8 @@ public class PACheck {
             return null;
         }
 
-        if (!force && arena.getFighters().size() < 2
+        //mjsong edit changed <2 to <1 in an effor to allow 1-player FFA to start.
+        if (!force && arena.getFighters().size() < 1
                 || arena.getFighters().size() < arena.getArenaConfig().getInt(
                 CFG.READY_MINPLAYERS)) {
             arena.getDebugger().i("not forcing and we have less than minplayers");
@@ -849,10 +918,17 @@ public class PACheck {
         // final PAStartEvent event = new PAStartEvent(arena);
 
         // comm to db mechanics
-        // call Api to init new game_session
+        // call Api to init new instance of game in smart contract
         TransactionInit newTransaction = new TransactionInit(arena);
         JSONObject json = newTransaction.getNewTransaction();
-        System.out.println(json.toString());
+
+        ServerClient conn = new ServerClient();
+        try {
+            conn.initiateSC(json);
+            System.out.println("http send success, at least on client side. check server");
+        } catch (Exception e){
+            System.out.println(e);
+        }
 
         // Bargo mechanics
 

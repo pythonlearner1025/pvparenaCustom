@@ -65,6 +65,21 @@ public class ArenaPlayer {
     private Scoreboard backupBoard;
     private String backupBoardTeam;
 
+
+    //mjsong code
+    private int bal;
+    //
+    public int getBal(){
+        return bal;
+    }
+
+    public void incBal(int amt){
+        bal += amt;
+    }
+
+    public void setBal(int amt){
+        bal = amt;
+    }
     /**
      * Status
      *
