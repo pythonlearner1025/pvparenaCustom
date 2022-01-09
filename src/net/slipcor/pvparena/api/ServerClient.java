@@ -28,6 +28,8 @@ public class ServerClient {
         return true;
     }
 
+
+    // eventually replace all URIs with environment variables
     public void sendGet() throws Exception {
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -61,6 +63,7 @@ public class ServerClient {
 
     }
 
+    // redis game-session server
     public void initiateSC(JSONObject data) throws Exception {
        URI targetURI = URI.create("http://localhost:8000/");
        sendPost(data, targetURI);
@@ -80,4 +83,37 @@ public class ServerClient {
         URI targetURI = URI.create("http://localhost:8000/enter");
         sendPost(data, targetURI);
     }
+
+    // redis server-info server
+    public void registerServer(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://localhost:3000/update/register");
+        sendPost(data, targetURI);
+    }
+
+    // can player join arena? this may have to be async bool return
+    public void playerJoinArena(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://localhost:3000/update/playerjoinarena");
+       sendPost(data, targetURI);
+    }
+
+    public void updateGameStatus(JSONObject data) throws Exception{
+
+    }
+
+    public void updateGameStats(JSONObject data) throws Exception{
+
+    }
+
+    // player joins server
+    public void playerJoinServer(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://localhost:3000/update/playerjoinserver");
+        sendPost(data, targetURI);
+    }
+
+    // player leaves server
+    public void playerExitServer(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://localhost:3000/update/playerexitserver");
+        sendPost(data, targetURI);
+    }
+
 }

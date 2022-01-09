@@ -1,5 +1,6 @@
 package net.slipcor.pvparena;
 
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaClass;
 import net.slipcor.pvparena.arena.ArenaPlayer;
@@ -11,15 +12,13 @@ import net.slipcor.pvparena.core.Help;
 import net.slipcor.pvparena.core.Language;
 import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.core.StringParser;
-import net.slipcor.pvparena.listeners.BlockListener;
-import net.slipcor.pvparena.listeners.EntityListener;
-import net.slipcor.pvparena.listeners.InventoryListener;
-import net.slipcor.pvparena.listeners.PlayerListener;
+import net.slipcor.pvparena.listeners.*;
 import net.slipcor.pvparena.loadables.ArenaGoalManager;
 import net.slipcor.pvparena.loadables.ArenaModule;
 import net.slipcor.pvparena.loadables.ArenaModuleManager;
 import net.slipcor.pvparena.loadables.ArenaRegionShapeManager;
 import net.slipcor.pvparena.managers.ArenaManager;
+import net.slipcor.pvparena.managers.ServerInfoManager;
 import net.slipcor.pvparena.managers.StatisticsManager;
 import net.slipcor.pvparena.managers.TabManager;
 import net.slipcor.pvparena.updater.UpdateChecker;
@@ -31,6 +30,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.json.simple.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -448,6 +448,24 @@ public class PVPArena extends JavaPlugin {
                 this);
         getServer().getPluginManager().registerEvents(new InventoryListener(),
                 this);
+
+        // mjsong21 code
+        // these listeners trigger player join/leave events of game server to the redis server
+        getServer().getPluginManager().registerEvents(new LoginListener(), this);
+        getServer().getPluginManager().registerEvents(new LogoutListener(), this);
+        // print max players, this info also must be sent
+        // to redis server on server enable
+        // when plugin online, send info to REDIS SEVER:
+        ServerInfoManager.registerServerInfo();
+        JSONObject serverInfo = ServerInfoManager.getServerInfo();
+        ServerClient conn = new ServerClient();
+        try {
+            conn.registerServer(serverInfo);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // end mjsong code
 
         if (getConfig().getInt("ver", 0) < 1) {
             getConfig().options().copyDefaults(true);
