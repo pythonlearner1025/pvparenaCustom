@@ -1,9 +1,11 @@
 package net.slipcor.pvparena.commands;
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.core.Language;
 import net.slipcor.pvparena.managers.ArenaManager;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.json.simple.JSONObject;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,6 +50,22 @@ public class PAA_SetFee extends AbstractArenaCommand{
             int fee = Integer.parseInt(args[0]);
             arena.setEntranceFee(fee);
             System.out.println("set entrance fee as " + fee);
+
+            // setfee, and immediately register arena
+            JSONObject data = new JSONObject();
+            int entranceFee = arena.getEntranceFee();
+            System.out.println("check gameUID" + arena.getGameUID());
+            data.put("gameUID", arena.getGameUID());
+            data.put("entranceFee", entranceFee);
+
+            ServerClient conn = new ServerClient();
+            try {
+                conn.initiateSC(data);
+            } catch (Exception e){
+                System.out.println(e);
+            }
+
+
         } catch (Exception e){
             Arena.pmsg(sender, "enter a valid integer fee");
             return;

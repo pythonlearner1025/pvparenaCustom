@@ -14,6 +14,7 @@ import net.slipcor.pvparena.loadables.ArenaRegion;
 import net.slipcor.pvparena.loadables.ArenaRegion.RegionType;
 import net.slipcor.pvparena.managers.*;
 import net.slipcor.pvparena.runnables.StartRunnable;
+import net.slipcor.pvparena.utils.RandomGenerator;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -95,6 +96,8 @@ public class Arena {
     private int pot;
     private boolean potInit;
     private String potOwner;
+    // mjsong DEV9 --> randomly gen gameUID per new arena instance
+    private String gameUID;
 
     // Runnable IDs
     public BukkitRunnable endRunner;
@@ -118,7 +121,7 @@ public class Arena {
         this.pot = 0;
         this.potInit = false;
         this.potOwner = null;
-
+        this.gameUID = RandomGenerator.generateRandomString(8);
         // end mjsong code
 
         getDebugger().i("loading Arena " + name);
@@ -186,6 +189,10 @@ public class Arena {
             pot = newPot;
             potInit = true;
         }
+    }
+
+    public String getGameUID(){
+        return gameUID;
     }
 
 

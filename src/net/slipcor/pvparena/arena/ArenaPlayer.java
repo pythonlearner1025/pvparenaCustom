@@ -68,6 +68,8 @@ public class ArenaPlayer {
 
     //mjsong code
     private int bal;
+    // pubkey associated w/ player that will be rewarded
+    private String pubKey;
     //
     public int getBal(){
         return bal;
@@ -79,6 +81,14 @@ public class ArenaPlayer {
 
     public void setBal(int amt){
         bal = amt;
+    }
+
+    public void setPubKey(String key) {
+        pubKey = key;
+    }
+
+    public String getPubKey() {
+        return pubKey;
     }
     /**
      * Status

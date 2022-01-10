@@ -2,6 +2,7 @@ package net.slipcor.pvparena.listeners;
 
 import net.slipcor.pvparena.PVPArena;
 import net.slipcor.pvparena.api.ServerClient;
+import net.slipcor.pvparena.api.ServerUtils;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.arena.ArenaPlayer;
 import net.slipcor.pvparena.arena.ArenaPlayer.Status;
@@ -24,10 +25,7 @@ import net.slipcor.pvparena.loadables.ArenaModuleManager;
 import net.slipcor.pvparena.loadables.ArenaRegion;
 import net.slipcor.pvparena.loadables.ArenaRegion.RegionProtection;
 import net.slipcor.pvparena.loadables.ArenaRegion.RegionType;
-import net.slipcor.pvparena.managers.ArenaManager;
-import net.slipcor.pvparena.managers.InventoryManager;
-import net.slipcor.pvparena.managers.SpawnManager;
-import net.slipcor.pvparena.managers.TeamManager;
+import net.slipcor.pvparena.managers.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -45,6 +43,7 @@ import org.bukkit.event.player.*;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.IllegalPluginAccessException;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
 import java.util.*;
 
@@ -455,7 +454,7 @@ public class PlayerListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOW)
-    public void onPlayerInteract(final PlayerInteractEvent event) {
+    public void onPlayerInteract(final PlayerInteractEvent event) throws Exception {
         final Player player = event.getPlayer();
         DEBUG.i("onPlayerInteract", player);
 
@@ -622,7 +621,6 @@ public class PlayerListener implements Listener {
                 if (aPlayer.getStatus() != Status.LOUNGE && aPlayer.getStatus() != Status.READY) {
                     return;
                 }
-                System.out.println("should not enter here");
                 event.setCancelled(true);
                 arena.getDebugger().i("Cancelled ready block click event to prevent itemstack consumation");
                 Bukkit.getScheduler().runTaskLater(PVPArena.instance, new Runnable() {
@@ -638,7 +636,6 @@ public class PlayerListener implements Listener {
                 arena.getDebugger().i("===============", player);
 
                 if (!arena.isFightInProgress()) {
-                    System.out.println("fight not in progress!");
                     if (aPlayer.getStatus() != Status.READY) {
                         arena.msg(player, Language.parse(arena, MSG.READY_DONE));
                         if (!alreadyReady) {
@@ -673,52 +670,76 @@ public class PlayerListener implements Listener {
 
                     if (error == null) {
                         // this is how the arena starts on iron-block touch.
-                        // mjsong TODO:
-                        JSONObject entrance = new JSONObject();
-                        JSONObject feeDetails = new JSONObject();
-                        feeDetails.put("requesting player", aPlayer.getName());
-                        feeDetails.put("entrancefee", arena.getEntranceFee());
-                        entrance.put("entrance request",feeDetails);
+
+
                         ServerClient conn = new ServerClient();
-                        try {
-                            conn.playerEnterSC(entrance);
-                            System.out.println("http send success, at least on client side. check server");
-                        } catch (Exception e){
-                            System.out.println(e);
-                        }
+                        // first, set-up player.
+                        String playerName = aPlayer.getName();
+                        String serverUID = ServerInfoManager.getServerUID();
+                        // TODO: remove hard-coded... add multiplier logic
+                        int currentMultiplier = 1;
+                        ServerUtils.setupPlayer(conn, playerName, serverUID, currentMultiplier);
 
-                        // first check player balance >= entranceFee
-                        // then allow join, and inc pot
-                        aPlayer.incBal(arena.getEntranceFee());
+                            // considerations --> is waiting for response from server thread-blocking?
+                            // cuz while this may be good for 1 player situation, can fuck up whole server
+                        // then, send authorization request
+                        JSONObject reply = ServerUtils.isPlayerAuthorized(conn, playerName, serverUID, currentMultiplier);
+                        boolean entry = (boolean) reply.get("entry");
 
-                        arena.incrementPot(arena.getEntranceFee());
-                        String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
 
-                        final Set<ArenaPlayer> players = arena.getFighters();
-                        for (final ArenaPlayer ap : players) {
-                            if (ap.get() != null) {
-                                if (ap.getName().equals(aPlayer.getName())){
-                                    arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
-                                } else {
-                                    arena.msg(ap.get(), balIncMsg);
+                        // if entry: true, proceed
+                        // else: send player link to payment
+
+
+                        if (entry){
+                            // info required by redi-server (http://localhost:8000/update/)
+                            /*
+                                entry: bool
+                                nonce: str
+                                multiplier: str
+                                pubKey: str
+                             */
+
+                            // set pubKey
+                            String pubKey = (String) reply.get("pubKey");
+                            aPlayer.setPubKey(pubKey);
+                            // IMPORTANT: add shares to player in player-share array
+                            // only if player bought new respawns (can only buy 3 at a time)
+                            // why respawns == 2? because THIS is the 1st respawn (first entry counts
+                            // as respawn, and so it was immediately deducted when authorizing player
+                            // to join
+
+                            int respawns = Integer.parseInt((String) reply.get("respawns"));
+                            if (respawns == 3){
+                                reply.put("gameUID", arena.getGameUID());
+                                ServerUtils.updatePlayerToSC(conn, reply);
+                            }
+
+                            // first check player balance >= entranceFee
+                            // then allow join, and inc pot
+                            // TODO: properly calculate entranceFee
+                            aPlayer.incBal(arena.getEntranceFee());
+
+                            arena.incrementPot(arena.getEntranceFee());
+                            String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+
+                            final Set<ArenaPlayer> players = arena.getFighters();
+                            for (final ArenaPlayer ap : players) {
+                                if (ap.get() != null) {
+                                    if (ap.getName().equals(aPlayer.getName())){
+                                        arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
+                                    } else {
+                                        arena.msg(ap.get(), balIncMsg);
+                                    }
                                 }
                             }
+                         arena.start();
+                         return;
+                        } else {
+                            System.out.println("entry false");
+                            // prompt user with purchase code
+                            return;
                         }
-                        // disable for now
-                        /*
-                        arena.incrementPot(arena.getEntranceFee());
-                        String potIncMsg = "new Pot Size:" + arena.getPot();
-
-                        final Set<ArenaPlayer> players = arena.getFighters();
-                        for (final ArenaPlayer ap : players) {
-                            if (ap.get() != null) {
-                                arena.msg(ap.get(), potIncMsg);
-                            }
-                        }
-
-                         */
-                        arena.start();
-                        return;
                     } else if (error.isEmpty()) {
                         arena.countDown();
                         return;
@@ -728,6 +749,71 @@ public class PlayerListener implements Listener {
                     }
                 }
 
+                // NOTE: below is for all player joining
+                // who are not first players.
+                // this whole process should be abstracted into a function IMO.
+
+
+                ServerClient conn = new ServerClient();
+                // first, set-up player.
+                String playerName = aPlayer.getName();
+                String serverUID = ServerInfoManager.getServerUID();
+                // TODO: remove hard-coded... add multiplier logic
+                int currentMultiplier = 1;
+
+                ServerUtils.setupPlayer(conn, playerName, serverUID, currentMultiplier);
+
+                // considerations --> is waiting for response from server thread-blocking?
+                // cuz while this may be good for 1 player situation, can fuck up whole server
+                JSONObject reply = ServerUtils.isPlayerAuthorized(conn, playerName, serverUID, currentMultiplier);
+                boolean entry = (boolean) reply.get("entry");
+
+
+                // if entry: true, proceed
+                // else: send player link to payment
+
+
+                // player now joins --> if respawn === 3 (so just made payment), inc shares by
+                // 2^(nonce) * multiplier * fixedPrice
+                if (entry){
+                    String pubKey = (String) reply.get("pubKey");
+                    aPlayer.setPubKey(pubKey);
+                    // IMPORTANT: add shares to player in player-share array
+                    // only if player bought new respawns (can only buy 3 at a time)
+                    // why respawns == 2? because THIS is the 1st respawn (first entry counts
+                    // as respawn, and so it was immediately deducted when authorizing player
+                    // to join
+
+                    int respawns = Integer.parseInt((String) reply.get("respawns"));
+                    if (respawns == 3){
+                        reply.put("gameUID", arena.getGameUID());
+                        ServerUtils.updatePlayerToSC(conn, reply);
+                    }
+
+                    // TODO: properly calc player bal based on nonce, mult, and arena.getEntranceFee();
+                    aPlayer.incBal(arena.getEntranceFee());
+
+                    arena.incrementPot(arena.getEntranceFee());
+                    String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+
+                    final Set<ArenaPlayer> players = arena.getFighters();
+                    for (final ArenaPlayer ap : players) {
+                        if (ap.get() != null) {
+                            if (ap.getName().equals(aPlayer.getName())){
+                                arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
+                            } else {
+                                arena.msg(ap.get(), balIncMsg);
+                            }
+                        }
+                    }
+
+                } else {
+                    System.out.println("entry false");
+                    // prompt user with purchase code
+                    return;
+                }
+
+                /*
                 // check player eligibility
                 // mjsong TODO:
                 System.out.println("CHECKING ENTRANCE OF PLAYER WHILE FIGHT IN PROGRESS!!");
@@ -774,6 +860,7 @@ public class PlayerListener implements Listener {
                     }
                 }
                  */
+
 
                 final Set<PASpawn> spawns = new HashSet<>();
                 if (arena.getArenaConfig().getBoolean(CFG.GENERAL_CLASSSPAWN)) {

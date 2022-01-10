@@ -21,7 +21,7 @@ public class LogoutListener implements Listener {
         ServerClient conn = new ServerClient();
         JSONObject data = new JSONObject();
         data.put("serverUID",serverUID);
-        data.put("leftPlayerName", leftPlayerName);
+       // data.put("leftPlayerName", leftPlayerName);
         conn.playerExitServer(data);
         System.out.println("notified redis server about player exit");
     }

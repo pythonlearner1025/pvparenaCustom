@@ -433,21 +433,25 @@ public class ArenaGoalManager {
                "mjson msg: game has concluded!", "WINNER");
 
 
-        JSONObject end = new JSONObject();
+        JSONObject data = new JSONObject();
         JSONArray playedPlayers = new JSONArray();
 
         Set<ArenaPlayer> players = arena.getFighters();
         for (final ArenaPlayer ap: players){
-            playedPlayers.add(ap.getName());
+            playedPlayers.add(ap.getPubKey());
+            System.out.println("winner pubkey: " + ap.getPubKey());
             arena.broadcast(ap.getName() + " won " + ap.getBal());
             arena.broadcast("pot winner: " + arena.getPotOwner());
             ap.setBal(0);
         }
-        end.put("players to keep rewards:", playedPlayers);
+        // hard-coded.
+
+        data.put("gameUID", arena.getGameUID());
+        data.put("pubKeysToReward", playedPlayers);
 
         ServerClient conn = new ServerClient();
         try {
-            conn.commitSC(end);
+            conn.commitSC(data);
             System.out.println("http send success, at least on client side. check server");
         } catch (Exception e){
             System.out.println(e);

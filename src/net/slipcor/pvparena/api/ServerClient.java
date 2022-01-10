@@ -45,7 +45,7 @@ public class ServerClient {
 
     }
 
-    private void sendPost(JSONObject data, URI targetURI) throws Exception {
+    private String sendPost(JSONObject data, URI targetURI) throws Exception {
         System.out.println("check body, normal string: " + data.toString());
         System.out.println("check body, json string: " + data.toJSONString());
         // form parameters
@@ -60,6 +60,8 @@ public class ServerClient {
 
         System.out.println(response.statusCode());
         System.out.println(response.body());
+
+        return response.body();
 
     }
 
@@ -91,9 +93,15 @@ public class ServerClient {
     }
 
     // can player join arena? this may have to be async bool return
-    public void playerJoinArena(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:3000/update/playerjoinarena");
-       sendPost(data, targetURI);
+    public String authorizePlayer(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://localhost:3000/update/authorizeplayer");
+        return sendPost(data, targetURI);
+    }
+
+    // setup player before every authorize call
+    public String setupPlayer(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://localhost:3000/update/setupplayer");
+        return sendPost(data, targetURI);
     }
 
     public void updateGameStatus(JSONObject data) throws Exception{
@@ -103,7 +111,6 @@ public class ServerClient {
     public void updateGameStats(JSONObject data) throws Exception{
 
     }
-
     // player joins server
     public void playerJoinServer(JSONObject data) throws Exception{
         URI targetURI = URI.create("http://localhost:3000/update/playerjoinserver");

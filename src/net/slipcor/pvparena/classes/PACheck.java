@@ -916,26 +916,30 @@ public class PACheck {
         // below is the original position of event declaration. I modified to add it below after
         // appending potOwner to arena.
         // final PAStartEvent event = new PAStartEvent(arena);
+        if (arena.getEntranceFee() == 0) {
+            throw new RuntimeException("entrance fee not set");
+        }
 
+        // mjsong DEV9 comment-out
+        /*
         // comm to db mechanics
         // call Api to init new instance of game in smart contract
-        TransactionInit newTransaction = new TransactionInit(arena);
-        JSONObject json = newTransaction.getNewTransaction();
+        JSONObject data = new JSONObject();
+        int entranceFee = arena.getEntranceFee();
+        System.out.println("check gameUID" + arena.getGameUID());
+        data.put("gameUID", arena.getGameUID());
+        data.put("entranceFee", entranceFee);
 
         ServerClient conn = new ServerClient();
         try {
-            conn.initiateSC(json);
-            System.out.println("http send success, at least on client side. check server");
+            conn.initiateSC(data);
         } catch (Exception e){
             System.out.println(e);
         }
 
-        // Bargo mechanics
+         */
 
-        // check if potAmount, and entranceFee has been set
-        if (arena.getEntranceFee() == 0) {
-            throw new RuntimeException("entrance fee not set");
-        }
+
         // set the first player who joined the arena to be the potOwner
         Set<ArenaPlayer> fighters = arena.getFighters();
 

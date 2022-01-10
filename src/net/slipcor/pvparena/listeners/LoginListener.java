@@ -19,7 +19,7 @@ public class LoginListener implements Listener {
         ServerClient conn = new ServerClient();
         JSONObject data = new JSONObject();
         data.put("serverUID", serverUID);
-        data.put("joinedPlayerName", joinedPlayerName);
+        //data.put("joinedPlayerName", joinedPlayerName);
         conn.playerJoinServer(data);
         System.out.println("notified redis server about new player join");
     }
