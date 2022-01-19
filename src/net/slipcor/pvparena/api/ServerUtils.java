@@ -1,37 +1,29 @@
 package net.slipcor.pvparena.api;
 
 import net.slipcor.pvparena.managers.ServerInfoManager;
+import net.slipcor.pvparena.utils.JsonData;
+import org.bukkit.Server;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
+
+// TODO: wrap all jsonData here before sending off to listen/mid server.. for better code legibility
 public class ServerUtils {
 
-    public static void setupPlayer(ServerClient conn, String playerName, String serverUID, int currentMultiplier) throws Exception {
+    public static void setupPlayer(ServerClient conn, String playerName, String gameUID, int currentMultiplier, int entranceFee) throws Exception {
         // TODO: remove hard-coded... add multiplier logic
-        JSONObject data = new JSONObject();
-        data.put("player", playerName);
-        data.put("serverUID", serverUID);
-        data.put("currentMultiplier", currentMultiplier);
+        JSONObject data = JsonData.setupPlayerData(playerName, gameUID, currentMultiplier, entranceFee);
         conn.setupPlayer(data);
     }
 
-    public static JSONObject isPlayerAuthorized(ServerClient conn, String playerName, String serverUID, int currentMultiplier) throws Exception {
-        JSONObject data = new JSONObject();
-        data.put("player", playerName);
-        data.put("serverUID", serverUID);
-        data.put("currentMultiplier", currentMultiplier);
+    public static JSONObject isPlayerAuthorized(ServerClient conn, String playerName, String gameUID, int currentMultiplier) throws Exception {
+        JSONObject data = JsonData.playerAuthorizedData(playerName, gameUID, currentMultiplier);
         String resp = conn.authorizePlayer(data);
-        System.out.println(resp);
         JSONParser parser = new JSONParser();
         JSONObject jsonResp = (JSONObject) parser.parse(resp);
-        System.out.println("printing resp"+ resp);
+        // TODO: remove print
         System.out.println("printing jsonResp" + jsonResp);
         return jsonResp;
     }
-
-    public static void updatePlayerToSC(ServerClient conn, JSONObject data) throws Exception {
-        conn.playerEnterSC(data);
-    }
-
 
 }

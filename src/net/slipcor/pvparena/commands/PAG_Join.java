@@ -13,8 +13,14 @@ import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.loadables.ArenaRegion;
 import net.slipcor.pvparena.managers.ArenaManager;
 import net.slipcor.pvparena.managers.ConfigurationManager;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Score;
+import org.bukkit.scoreboard.Scoreboard;
 
 import java.util.Collections;
 import java.util.List;
@@ -52,15 +58,6 @@ public class PAG_Join extends AbstractArenaCommand {
         }
 
         // mjsong code
-        ServerClient conn = new ServerClient();
-        if (arena.getEntranceFee() == 0){
-            throw new RuntimeException("cannt join: the admin must set an entrance fee");
-        }
-        String data = "name:" + sender.getName() + ", entrance fee:" + arena.getEntranceFee();
-        conn.sendRequest(data);
-        System.out.println("pot size: " + arena.getPot());
-        System.out.println("fee size: " + arena.getEntranceFee());
-
 
 
         // mjsong try

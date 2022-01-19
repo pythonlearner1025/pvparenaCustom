@@ -17,7 +17,9 @@ public class ServerInfoManager {
         File infoFile = new File(baseDir + "/plugins/pvparena/serverinfo/info.json");
         System.out.println("dir: " + infoFile);
         try (FileReader reader = new FileReader(infoFile)) {
+            // regardless of existence, over-write the fail anew
             System.out.println("info.json already exists");
+
         } catch (FileNotFoundException e) {
             // file not found, therefore write new one
             String serverUID = genRandString();
@@ -28,6 +30,11 @@ public class ServerInfoManager {
             info.put("gameType", gameType);
             info.put("maxCap", maxCap);
 
+            // TODO: mkdir to make /serverinfo file if it DNE --> check if below works
+            File directory = new File(baseDir + "/plugins/pvparena/serverinfo");
+            if (directory.mkdir()){
+                System.out.println("/serverinfo created");
+            }
 
             try (FileWriter file = new FileWriter(infoFile)){
                 file.write(info.toJSONString());

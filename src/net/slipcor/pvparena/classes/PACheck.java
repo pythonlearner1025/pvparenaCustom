@@ -26,6 +26,10 @@ import net.slipcor.pvparena.ncloader.NCBLoadable;
 import net.slipcor.pvparena.runnables.InventoryRefillRunnable;
 import net.slipcor.pvparena.runnables.PVPActivateRunnable;
 import net.slipcor.pvparena.runnables.SpawnCampRunnable;
+import net.slipcor.pvparena.utils.MergeSort;
+import net.slipcor.pvparena.utils.NameTagChanger;
+import net.slipcor.pvparena.utils.TeamAction;
+import net.slipcor.pvparena.utils.Tuple;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.attribute.Attribute;
@@ -41,7 +45,10 @@ import java.util.*;
 
 // mjsong21 import: import TransactionInit to create new transaction obj
 
-import net.slipcor.pvparena.api.TransactionInit;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Score;
+import org.bukkit.scoreboard.Scoreboard;
 import org.json.simple.JSONObject;
 
 /**
@@ -282,6 +289,21 @@ public class PACheck {
     // the arena (has enough money)
     public static boolean handleJoin(final Arena arena,
                                      final CommandSender sender, final String[] args) {
+
+
+        if (!arena.registered) {
+            ServerClient conn = new ServerClient();
+            JSONObject obj = new JSONObject();
+            obj.put("gameUID", arena.getGameUID());
+            obj.put("serverUID", ServerInfoManager.getServerUID());
+            try{
+                conn.registerGame(obj);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            arena.setRegistered();
+        }
         arena.getDebugger().i("handleJoin!");
         int priority = 0;
         PACheck res = new PACheck();
@@ -386,7 +408,7 @@ public class PACheck {
 
 
         // player --> sender of join req command (/join )
-        final ArenaPlayer player = ArenaPlayer.parsePlayer(sender.getName());
+        ArenaPlayer player = ArenaPlayer.parsePlayer(sender.getName());
 
         ArenaModuleManager.choosePlayerTeam(arena, (Player) sender,
                 team.getColoredName());
@@ -396,8 +418,26 @@ public class PACheck {
         player.setPublicChatting(!arena.getArenaConfig().getBoolean(
                 CFG.CHAT_DEFAULTTEAM));
 
+
+        Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective obj = board.registerNewObjective("FIGHT CLUB", "dummy", ChatColor.RED + "FIGHT CLUB");
+        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+        Score thisScore = obj.getScore(ChatColor.GREEN + "Balance:");
+        thisScore.setScore(0);
+
+        Objective obj2 = board.registerNewObjective("DISPLAY BAL", "dummy", ".");
+        obj2.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        Score thisScore2 = obj2.getScore(ChatColor.AQUA + "$ ");
+        thisScore2.setScore(0);
+
+        ((Player) sender).getPlayer().setScoreboard(board);
+
         // mjsong edit: main method of join!
         // late join being called
+        // add player to boss bar upon join
+
+        arena.addPlayerToBossBar(player.get());
+
         if (commModule != null) {
             arena.getDebugger().i("calling event #1");
 
@@ -514,9 +554,15 @@ public class PACheck {
 
     public static void handlePlayerDeath(final Arena arena,
                                          final Player player, final PlayerDeathEvent event) {
+
+        if (player == null){
+            System.out.println("critical error");
+            throw new RuntimeException("palyer null");
+        }
         int priority = 0;
         PACheck res = new PACheck();
 
+        /*
         ArenaGoal commit = null;
 
         for (final ArenaGoal mod : arena.getGoals()) {
@@ -534,6 +580,8 @@ public class PACheck {
                 arena.getDebugger().i("else", player);
             }
         }
+
+         */
 
         boolean doesRespawn = true;
         if (res.hasError()) {
@@ -553,88 +601,92 @@ public class PACheck {
         // give killer the pot ownership
         Set<ArenaPlayer> players = arena.getFighters();
         if (player.getKiller() != null) {
-            // check if player was the pot owner
-            // if player was the pot owner, new potOwner = player.getKiller()
+            // mjsong DEV10 --> if richestPlayer died, inc timer
+            Tuple[] playerBalTuple = new Tuple[players.size()];
+            int i = 0;
+            for (ArenaPlayer ap: players){
+                playerBalTuple[i] = new Tuple(ap.getName(), ap.getBal());
+                i++;
+            }
+            MergeSort sort = new MergeSort(playerBalTuple);
+            sort.sortByPlayerBal();
+            String richestPlayer = sort.getRichestPlayer();
 
-            if (arena.getPotOwner().equals(player.getName())){
-                arena.setPotOwner(player.getKiller().getName());
-
-                final int extraTime = 30;
+            if (player.getName().equals(richestPlayer)) {
+                // TODO:
+                // make this configurable
+                final int extraTime = 60;
 
                 for (ArenaGoal goal : arena.getGoals()) {
                     // mjsong code
-                    System.out.println("expecting safelyIncTime: ... ");
-                    if (goal instanceof GoalTime){
+                    if (goal instanceof GoalTime) {
                         // try inc time by 30 seconds per player join.
-                        System.out.println("entered safelyIncTime");
                         try {
                             ((GoalTime) goal).safelyIncTime(extraTime);
-                        } catch (Exception e){
+                        } catch (Exception e) {
                             System.out.println("failed to inc time: " + e);
                         }
                     }
-
                 }
 
-                // seperate from pot ownership: bal change by kill
 
 
-
-
-                // global msgs for players
-                final String killMsg = player.getKiller().getName() + " now owns the pot!";
-                final String timeMsg = extraTime + " seconds added to the clock!";
-
-                for (final ArenaPlayer ap : players) {
-                    if (ap.get() != null) {
-                        arena.msg(ap.get(), killMsg);
-                        arena.msg(ap.get(), timeMsg);
-                    }
+            }
+            // global msgs for players
+            final String timeMsg = "60 seconds added to the clock!";
+            arena.broadcast("Richest Player Died! " + timeMsg);
+            // TODO: check if the cast works
+            ArenaPlayer loser = null;
+            ArenaPlayer winner = null;
+            for (ArenaPlayer ap : arena.getFighters()) {
+                if (ap.getName().equals(player.getName())) {
+                    loser = ap;
+                } else if (ap.getName().equals(player.getKiller().getName())) {
+                    winner = ap;
                 }
             }
-            ArenaPlayer victim = null;
-            ArenaPlayer killer = null;
-            for (ArenaPlayer aPlayer: players) {
-                if (aPlayer.getName().equals(player.getName())){
-                    victim = aPlayer;
-                }
-                else if (aPlayer.getName().equals(player.getKiller().getName())){
-                    killer = aPlayer;
-                }
-            }
-
-            // really primitive way of exchaning value. Make this better.
-            // eventually connected to chain!
-            if (victim != null && killer != null){
-
                 // injection point for comm with server
-                JSONObject update = new JSONObject();
-                JSONObject victimJSON = new JSONObject();
-                victimJSON.put("oldBal", victim.getBal());
-                victimJSON.put("newBal", 0);
-                update.put("victim", victimJSON);
+            /*
+            JSONObject update = new JSONObject();
+            update.put("gameUID", arena.getGameUID());
+            update.put("winnerPubKey", winner.getPubKey());
+            update.put("loserPubKey", loser.getPubKey());
 
-                JSONObject killerJSON = new JSONObject();
-                killerJSON.put("oldBal", killer.getBal());
-                killerJSON.put("newBal", killer.getBal() + victim.getBal());
-                update.put("killer", killerJSON);
-
-                ServerClient conn = new ServerClient();
-                try {
-                    conn.playerUpdateSC(update);
-                    System.out.println("http send success, at least on client side. check server");
-                } catch (Exception e){
-                    System.out.println(e);
-                }
-
-                int booty = victim.getBal();
-                victim.setBal(0);
-                killer.incBal(booty);
-                final String victimMsg = killer.getName() + " looted you! new balance: " + victim.getBal();
-                final String killerMsg = "You looted " + victim.getName() + "'s booty! new balance: " + killer.getBal();
-                arena.msg(victim.get(), victimMsg);
-                arena.msg(killer.get(), killerMsg);
+            ServerClient conn = new ServerClient();
+            try {
+                conn.transaction(update);
+                System.out.println("http send success, at least on client side. check server");
+            } catch (Exception e){
+                System.out.println(e);
             }
+             */
+
+            int booty = loser.getBal();
+            loser.setBal(0);
+            winner.incBal(booty);
+
+            int shares = loser.getShares();
+            winner.incShares(shares);
+            loser.zeroShares();
+
+            Set<Score> scores = player.getScoreboard().getScores(ChatColor.GREEN + "Balance:");
+            for (Score score: scores){
+                score.setScore(loser.getBal());
+            }
+            Set<Score> scores2 = player.getKiller().getScoreboard().getScores(ChatColor.GREEN + "Balance:");
+            for (Score score: scores2){
+                score.setScore(winner.getBal());
+            }
+
+            // change display names
+            // set loser === 0
+            // set winner == newBal
+            String newBal = "$" + winner.getBal() + " ";
+            NameTagChanger.changePlayerName(player, "", player.getName(), TeamAction.DESTROY);
+            NameTagChanger.changePlayerName(player.getKiller(), newBal, player.getKiller().getName(), TeamAction.UPDATE);
+            final String killEvenMsg = winner.getName() +" killed " + loser.getName() + "for --> " + winner.getBal();
+            arena.broadcast(killEvenMsg);
+
 
             player.getKiller().setFoodLevel(
                     player.getKiller().getFoodLevel()
@@ -664,9 +716,20 @@ public class PACheck {
                 // mjsong inject end
                 SpawnManager.respawn(arena, ArenaPlayer.parsePlayer(player.getKiller().getName()), null, option);
             }
+        } else {
+            // if killer DNE (i.e., suicide or death by falling)
+            ArenaPlayer deadPlayer = null;
+            for (ArenaPlayer ap : arena.getFighters()) {
+                if (ap.getName().equals(player.getName())) {
+                    deadPlayer = ap;
+                }
+            }
+            assert deadPlayer != null;
+            deadPlayer.setBal(0);
+            NameTagChanger.changePlayerName(player, "", player.getName(), TeamAction.DESTROY);
         }
-
-        if (commit == null) {
+        // mjsong edit committ == null
+        if (true) {
             arena.getDebugger().i("no mod handles player deaths", player);
 
 
@@ -722,10 +785,10 @@ public class PACheck {
             return;
         }
 
-        arena.getDebugger().i("handled by: " + commit.getName(), player);
+       // arena.getDebugger().i("handled by: " + commit.getName(), player);
         final int exp = event.getDroppedExp();
 
-        commit.commitPlayerDeath(player, doesRespawn, res.error, event);
+        //commit.commitPlayerDeath(player, doesRespawn, res.error, event);
         for (final ArenaGoal g : arena.getGoals()) {
             arena.getDebugger().i("parsing death: " + g.getName(), player);
             g.parsePlayerDeath(player, player.getLastDamageCause());
@@ -998,7 +1061,7 @@ public class PACheck {
         final Set<ArenaRegion> battleRegions = arena.getRegionsByType(RegionType.BATTLE);
 
         for (final ArenaRegion region : arena.getRegions()) {
-            final Set<ArenaRegion.RegionFlag> flags = region.getFlags();
+            final Set<RegionFlag> flags = region.getFlags();
             if (flags.contains(RegionFlag.DEATH) || flags.contains(RegionFlag.WIN) || flags.contains(RegionFlag.LOSE) || flags.contains(RegionFlag.NOCAMP)) {
                 region.initTimer();
                 continue;

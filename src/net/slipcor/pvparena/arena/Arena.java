@@ -22,6 +22,10 @@ import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarFlag;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -92,6 +96,7 @@ public class Arena {
     private int round;
 
     // mjsong21 pot object
+
     private int entranceFee;
     private int pot;
     private boolean potInit;
@@ -113,9 +118,18 @@ public class Arena {
     private long startTime;
     private Scoreboard scoreboard = null;
 
-    public Arena(final String name) {
-        this.name = name;
+    private BossBar bossBar;
+    public boolean registered;
 
+
+    public Arena(final String name) {
+
+        // mjsong code:
+        // setup scoreboard
+
+        this.registered = false;
+        this.name = name;
+        this.bossBar = Bukkit.createBossBar("TOTAL POT $0", BarColor.PURPLE, BarStyle.SEGMENTED_10, BarFlag.DARKEN_SKY);
         // mjsong code
         this.entranceFee = 0;
         this.pot = 0;
@@ -157,10 +171,21 @@ public class Arena {
 
     // mjsong add to pot
 
+    public void setGameUID(){
+        gameUID = RandomGenerator.generateRandomString(8);
+    }
+
 
     public void incrementPot(int fee){
+
         pot += fee;
+        bossBar.setTitle("TOTAL POT $"+pot);
     }
+
+    public void addPlayerToBossBar(Player p){
+        bossBar.addPlayer(p);
+    }
+
 
     public int getPot(){
         return pot;
@@ -1068,15 +1093,11 @@ public class Arena {
      * @return null if ok, error message otherwise
      */
     public String ready() {
-        getDebugger().i("ready check !!");
+        return null;
 
+        /*
         final int players = TeamManager.countPlayersInTeams(this);
-        if (players < 2) {
-            // mjsong21 edit
-            // change the commented below, now returns null
-            //return Language.parse(this, MSG.ERROR_READY_1_ALONE);
-            return null;
-        }
+
         if (players < cfg.getInt(CFG.READY_MINPLAYERS)) {
             return Language.parse(this, MSG.ERROR_READY_4_MISSING_PLAYERS);
         }
@@ -1092,28 +1113,7 @@ public class Arena {
             }
         }
 
-        if (!free) {
-            final Set<String> activeTeams = new HashSet<>();
 
-            for (final ArenaTeam team : teams) {
-                for (final ArenaPlayer ap : team.getTeamMembers()) {
-                    if (!cfg.getBoolean(CFG.READY_CHECKEACHTEAM)
-                            || ap.getStatus() == Status.READY) {
-                        activeTeams.add(team.getName());
-                        break;
-                    }
-                }
-            }
-
-            if (cfg.getBoolean(CFG.USES_EVENTEAMS)
-                    && !TeamManager.checkEven(this)) {
-                return Language.parse(this, MSG.NOTICE_WAITING_EQUAL);
-            }
-
-            if (activeTeams.size() < 2) {
-                return Language.parse(this, MSG.ERROR_READY_2_TEAM_ALONE);
-            }
-        }
 
         final String error = PVPArena.instance.getAgm().ready(this);
         if (error != null) {
@@ -1163,6 +1163,8 @@ public class Arena {
             return Language.parse(this, MSG.ERROR_READY_0_ONE_PLAYER_NOT_READY);
         }
         return cfg.getBoolean(CFG.READY_ENFORCECOUNTDOWN) ? "" : null;
+
+         */
     }
 
     /**
@@ -1477,6 +1479,10 @@ public class Arena {
 
     }
 
+    public void setRegistered(){
+        registered = true;
+    }
+
     /**
      * reset an arena
      */
@@ -1497,10 +1503,9 @@ public class Arena {
         // mjsong inject
         // if this is called when arena reset, re-set representative values
         // (representative values) == on-chain equivalents for visual purposes
-
+        registered = false;
         pot = 0;
-
-
+        gameUID = RandomGenerator.generateRandomString(8);
         //
         resetPlayers(force);
         setFightInProgress(false);

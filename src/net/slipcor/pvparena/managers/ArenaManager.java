@@ -1,6 +1,7 @@
 package net.slipcor.pvparena.managers;
 
 import net.slipcor.pvparena.PVPArena;
+import net.slipcor.pvparena.api.ServerClient;
 import net.slipcor.pvparena.arena.Arena;
 import net.slipcor.pvparena.classes.PABlockLocation;
 import net.slipcor.pvparena.classes.PACheck;
@@ -26,6 +27,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.json.simple.JSONObject;
 
 import java.io.File;
 import java.util.*;
@@ -309,6 +311,20 @@ public final class ArenaManager {
                         DEBUG.i("arena: " + sName);
                         if (!ARENAS.containsKey(sName.toLowerCase())) {
                             Arena arena = new Arena(sName);
+                            /*
+                            ServerClient conn = new ServerClient();
+                            JSONObject registerData = new JSONObject();
+                            registerData.put("serverUID", ServerInfoManager.getServerUID());
+                            registerData.put("gameUID", arena.getGameUID());
+
+                            try {
+                                conn.registerGame(registerData);
+                            } catch (Exception e){
+                                System.out.println(e);
+                            }
+
+
+                             */
                             loadArena(arena);
                         }
                     } else {

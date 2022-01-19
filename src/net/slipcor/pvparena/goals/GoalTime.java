@@ -60,6 +60,7 @@ public class GoalTime extends ArenaGoal {
         return true;
     }
 
+    // mjsong21 this is where arena total time is set
     @Override
     public void parseStart() {
         final int timed = arena.getArenaConfig().getInt(CFG.GOAL_TIME_END);
@@ -80,6 +81,15 @@ public class GoalTime extends ArenaGoal {
         }
         ter.incrementTime(time);
         System.out.println(time + "seconds added to time!");
+    }
+
+    // get current multiplier
+    public int getCurrentMult(){
+        // for the first player
+        if (ter == null){
+            return 1;
+        }
+       return ter.getCurrentMultiplier();
     }
 
     // mjsong21 code end

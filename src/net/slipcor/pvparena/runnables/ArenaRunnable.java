@@ -37,6 +37,9 @@ public abstract class ArenaRunnable extends BukkitRunnable {
     protected final Arena arena;
     protected final Boolean global;
 
+    // mjsong additions
+    protected final Integer totalTime;
+    protected Integer multiplier;
     /**
      * Spam the message of the remaining time to... someone, probably:
      *
@@ -50,6 +53,8 @@ public abstract class ArenaRunnable extends BukkitRunnable {
         super();
         this.message = message;
         this.seconds = ArenaModuleManager.parseStartCountDown(seconds, message, arena, global);
+        this.totalTime = seconds;
+        this.multiplier = 1;
         sPlayer = player == null ? null : player.getName();
         this.arena = arena;
         this.global = global;
@@ -159,16 +164,37 @@ public abstract class ArenaRunnable extends BukkitRunnable {
     }
 
     // mjsong code: can adding to seconds directly of arenarunnable be an acceptable way to add seconds?
-    //
+
+    // mjsong DEV10 -->
+    // TODO: add time logic here
+
+    // total = X min
+    // if (currSec > total * (3/4) * 60) mult = 1
+    // else if (currSec > total * (2/4) * 60) mult = 2
+    // else if (currSec > total * (1/4) * 60) mult = 3
+    // else if (currSec > 0) mult = 4
 
     @Override
     public void run() {
+
         spam();
-        if (seconds <= 0) {
+        if (seconds == totalTime * 3 / 4){
+            //  mult 2
+           multiplier += 1;
+
+        } else if (seconds == totalTime / 2){
+            // mult 3
+           multiplier += 1;
+
+        } else if (seconds == totalTime / 4){
+            // mult 4
+           multiplier += 1;
+
+        } else if (seconds <= 0){
             commit();
             try {
                 cancel();
-            } catch (final IllegalStateException e) {
+            } catch (final IllegalStateException e){
                 warn();
             }
         }

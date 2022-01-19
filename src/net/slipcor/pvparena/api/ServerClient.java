@@ -1,15 +1,10 @@
 package net.slipcor.pvparena.api;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.json.simple.JSONObject;
-import org.json.simple.JSONArray;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
 
 public class ServerClient {
     private final HttpClient httpClient;
@@ -34,7 +29,7 @@ public class ServerClient {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .GET()
-                .uri(URI.create("http://localhost:8000"))
+                .uri(URI.create("http://45.33.25.141:8000"))
                 .setHeader("User-Agent", "Java 11 HttpClient Bot")
                 .build();
 
@@ -66,61 +61,71 @@ public class ServerClient {
     }
 
     // redis game-session server
-    public void initiateSC(JSONObject data) throws Exception {
-       URI targetURI = URI.create("http://localhost:8000/");
-       sendPost(data, targetURI);
-    }
-
-    public void playerUpdateSC(JSONObject data) throws Exception {
-        URI targetURI = URI.create("http://localhost:8000/update");
+    /*
+    public void register(JSONObject data) throws Exception {
+        URI targetURI = URI.create("http://127.0.0.1:5000/listen-server/register");
         sendPost(data, targetURI);
     }
 
-    public void commitSC(JSONObject data) throws Exception {
-        URI targetURI = URI.create("http://localhost:8000/commit");
+    public void transaction(JSONObject data) throws Exception {
+        URI targetURI = URI.create("http://127.0.0.1:5000/listen-server/transaction");
         sendPost(data, targetURI);
     }
 
-    public void playerEnterSC(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:8000/enter");
+    public void addShares(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://127.0.0.1:5000/listen-server/addshares");
         sendPost(data, targetURI);
     }
 
-    // redis server-info server
+     */
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // redis middle-server
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public void commit(JSONObject data) throws Exception {
+        URI targetURI = URI.create("http://45.33.25.141/commit");
+        sendPost(data, targetURI);
+    }
+
     public void registerServer(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:3000/update/register");
+        URI targetURI = URI.create("http://45.33.25.141/update/registerserver");
         sendPost(data, targetURI);
     }
-
+    // reigster GAMEUID so all other requests can go through
+    public void registerGame(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://45.33.25.141/update/registergame");
+        sendPost(data, targetURI);
+    }
     // can player join arena? this may have to be async bool return
     public String authorizePlayer(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:3000/update/authorizeplayer");
+        URI targetURI = URI.create("http://45.33.25.141/update/authorizeplayer");
         return sendPost(data, targetURI);
     }
 
     // setup player before every authorize call
-    public String setupPlayer(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:3000/update/setupplayer");
-        return sendPost(data, targetURI);
+    public void setupPlayer(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://45.33.25.141/update/setupplayer");
+        sendPost(data, targetURI);
     }
 
-    public void updateGameStatus(JSONObject data) throws Exception{
-
-    }
-
-    public void updateGameStats(JSONObject data) throws Exception{
-
-    }
     // player joins server
     public void playerJoinServer(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:3000/update/playerjoinserver");
+        URI targetURI = URI.create("http://45.33.25.141/update/playerjoinserver");
         sendPost(data, targetURI);
     }
 
     // player leaves server
     public void playerExitServer(JSONObject data) throws Exception{
-        URI targetURI = URI.create("http://localhost:3000/update/playerexitserver");
+        URI targetURI = URI.create("http://45.33.25.141/update/playerexitserver");
         sendPost(data, targetURI);
     }
+    // call when arena game ends, in order to clear player respawns / mult so to
+    // remove duplicates
+    public void flushData(JSONObject data) throws Exception{
+        URI targetURI = URI.create("http://45.33.25.141/update/flushdata");
+        sendPost(data, targetURI);
+    }
+
 
 }

@@ -12,7 +12,11 @@ import net.slipcor.pvparena.core.Debug;
 import net.slipcor.pvparena.core.Language;
 import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.goals.*;
+import net.slipcor.pvparena.managers.ServerInfoManager;
 import net.slipcor.pvparena.ncloader.NCBLoader;
+import net.slipcor.pvparena.utils.NameTagChanger;
+import net.slipcor.pvparena.utils.TeamAction;
+import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -21,6 +25,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.scoreboard.Score;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
@@ -425,37 +430,65 @@ public class ArenaGoalManager {
             }
 
          */
-            // mjsong injection:
-            // will always be the case, because players will not lose based on lack of lives.
 
-
-        ArenaModuleManager.announce(arena,
-               "mjson msg: game has concluded!", "WINNER");
-
-
+        // mjsong injection:
+        // send to listen-server to commit sc and flush players
         JSONObject data = new JSONObject();
-        JSONArray playedPlayers = new JSONArray();
+        JSONArray playersAtEnd = new JSONArray();
+        for (ArenaPlayer ap: arena.getFighters()){
 
-        Set<ArenaPlayer> players = arena.getFighters();
-        for (final ArenaPlayer ap: players){
-            playedPlayers.add(ap.getPubKey());
+            JSONObject tuple = new JSONObject();
+            tuple.put("pubKey", ap.getPubKey());
+            tuple.put("shares", ap.getShares());
+            playersAtEnd.add(tuple);
+
             System.out.println("winner pubkey: " + ap.getPubKey());
             arena.broadcast(ap.getName() + " won " + ap.getBal());
             arena.broadcast("pot winner: " + arena.getPotOwner());
+            // display final winnings
+            NameTagChanger.changePlayerName(ap.get(), "WON $"+ap.getBal()+" ", ap.getName(), TeamAction.UPDATE);
             ap.setBal(0);
+            ap.zeroShares();
+
+            Set<Score> _scores = ap.get().getScoreboard().getScores(ChatColor.GREEN + "Balance:");
+            for (Score score: _scores){
+                score.setScore(0);
+            }
         }
         // hard-coded.
-
         data.put("gameUID", arena.getGameUID());
-        data.put("pubKeysToReward", playedPlayers);
+        data.put("entranceFee", arena.getEntranceFee());
+        data.put("pubKeysToReward", playersAtEnd);
 
         ServerClient conn = new ServerClient();
         try {
-            conn.commitSC(data);
+            conn.commit(data);
             System.out.println("http send success, at least on client side. check server");
         } catch (Exception e){
             System.out.println(e);
         }
+
+
+
+        // send to middle-server to flush playedPlayers
+        JSONObject data2 = new JSONObject();
+        JSONArray playedPlayers = new JSONArray();
+
+        for (final String playedPlayerName: arena.getPlayedPlayers()){
+            playedPlayers.add(playedPlayerName);
+        }
+        data2.put("gameUID", arena.getGameUID());
+        data2.put("playedPlayers", playedPlayers);
+
+        try {
+            conn.flushData(data2);
+        } catch (Exception e){
+            System.out.println(e);
+        }
+
+        // mjsong code end
+
+
 
 
         // mjsong change: try removing all below, if it works, del

@@ -51,21 +51,6 @@ public class PAA_SetFee extends AbstractArenaCommand{
             arena.setEntranceFee(fee);
             System.out.println("set entrance fee as " + fee);
 
-            // setfee, and immediately register arena
-            JSONObject data = new JSONObject();
-            int entranceFee = arena.getEntranceFee();
-            System.out.println("check gameUID" + arena.getGameUID());
-            data.put("gameUID", arena.getGameUID());
-            data.put("entranceFee", entranceFee);
-
-            ServerClient conn = new ServerClient();
-            try {
-                conn.initiateSC(data);
-            } catch (Exception e){
-                System.out.println(e);
-            }
-
-
         } catch (Exception e){
             Arena.pmsg(sender, "enter a valid integer fee");
             return;

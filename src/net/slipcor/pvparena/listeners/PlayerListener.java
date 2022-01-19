@@ -26,6 +26,9 @@ import net.slipcor.pvparena.loadables.ArenaRegion;
 import net.slipcor.pvparena.loadables.ArenaRegion.RegionProtection;
 import net.slipcor.pvparena.loadables.ArenaRegion.RegionType;
 import net.slipcor.pvparena.managers.*;
+import net.slipcor.pvparena.utils.GetCurrentMult;
+import net.slipcor.pvparena.utils.NameTagChanger;
+import net.slipcor.pvparena.utils.TeamAction;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -42,6 +45,11 @@ import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.IllegalPluginAccessException;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Score;
+import org.bukkit.scoreboard.Scoreboard;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
@@ -600,6 +608,8 @@ public class PlayerListener implements Listener {
             }
 
              */
+
+
             arena.getDebugger().i("block click!", player);
 
             final Material mMat = arena.getReadyBlock();
@@ -610,13 +620,6 @@ public class PlayerListener implements Listener {
                 if (event.getHand() == EquipmentSlot.OFF_HAND) {
                     arena.getDebugger().i("out: offhand!", player);
                     return; // double event
-                }
-                if (aPlayer.getArenaClass() == null || aPlayer.getArenaClass().getName() != null && aPlayer.getArenaClass().getName().isEmpty()) {
-                    arena.msg(player, Language.parse(arena, MSG.ERROR_READY_NOCLASS));
-                    return; // not chosen class => OUT
-                }
-                if (arena.startRunner != null) {
-                    return; // counting down => OUT
                 }
                 if (aPlayer.getStatus() != Status.LOUNGE && aPlayer.getStatus() != Status.READY) {
                     return;
@@ -664,41 +667,36 @@ public class PlayerListener implements Listener {
 
                     final String error = arena.ready();
 
-
                     // mjsong major edit
-                    // player entrance legibility check: must communicate with external databse...
-
+                    // this is how the arena starts on iron-block touch.
                     if (error == null) {
-                        // this is how the arena starts on iron-block touch.
-
-
                         ServerClient conn = new ServerClient();
+                        // first, immediately register game
+                        /*
+                        ServerUtils.register(conn, arena.getGameUID(), arena.getEntranceFee());
+                         */
                         // first, set-up player.
                         String playerName = aPlayer.getName();
-                        String serverUID = ServerInfoManager.getServerUID();
+                        String gameUID = arena.getGameUID();
                         // TODO: remove hard-coded... add multiplier logic
-                        int currentMultiplier = 1;
-                        ServerUtils.setupPlayer(conn, playerName, serverUID, currentMultiplier);
+                        int currentMultiplier = GetCurrentMult.getCurrentMult(arena);
+                        if (currentMultiplier < 0){
+                            System.out.println("error getting currMult");
+                        }
 
-                            // considerations --> is waiting for response from server thread-blocking?
-                            // cuz while this may be good for 1 player situation, can fuck up whole server
-                        // then, send authorization request
-                        JSONObject reply = ServerUtils.isPlayerAuthorized(conn, playerName, serverUID, currentMultiplier);
+                        // for now, just use 1 always...
+                        currentMultiplier = 1;
+                        int fixedEntranceFee = arena.getEntranceFee();
+                        ServerUtils.setupPlayer(conn, playerName, gameUID, currentMultiplier, fixedEntranceFee);
+                        JSONObject reply = ServerUtils.isPlayerAuthorized(conn, playerName, gameUID, currentMultiplier);
                         boolean entry = (boolean) reply.get("entry");
-
-
                         // if entry: true, proceed
                         // else: send player link to payment
 
-
                         if (entry){
-                            // info required by redi-server (http://localhost:8000/update/)
-                            /*
-                                entry: bool
-                                nonce: str
-                                multiplier: str
-                                pubKey: str
-                             */
+                            // increment holograph display of total liquidity:
+
+
 
                             // set pubKey
                             String pubKey = (String) reply.get("pubKey");
@@ -710,36 +708,44 @@ public class PlayerListener implements Listener {
                             // to join
 
                             int respawns = Integer.parseInt((String) reply.get("respawns"));
-                            if (respawns == 3){
+                            if (respawns == 2){
+                                /*
                                 reply.put("gameUID", arena.getGameUID());
-                                ServerUtils.updatePlayerToSC(conn, reply);
-                            }
+                                ServerUtils.addShares(conn, reply);
 
-                            // first check player balance >= entranceFee
-                            // then allow join, and inc pot
-                            // TODO: properly calculate entranceFee
-                            aPlayer.incBal(arena.getEntranceFee());
+                                 */
+                                // first check player balance >= entranceFee
+                                // then allow join, and inc pot
+                                // TODO: properly calculate entranceFee
+                                int amt = arena.getEntranceFee() * currentMultiplier;
+                                aPlayer.incBal(amt);
+                                aPlayer.incShares(1);
 
-                            arena.incrementPot(arena.getEntranceFee());
-                            String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+                                // also increment arena total liquidity
+                                arena.incrementPot(amt);
 
-                            final Set<ArenaPlayer> players = arena.getFighters();
-                            for (final ArenaPlayer ap : players) {
-                                if (ap.get() != null) {
-                                    if (ap.getName().equals(aPlayer.getName())){
-                                        arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
-                                    } else {
-                                        arena.msg(ap.get(), balIncMsg);
-                                    }
+
+                                String money = "$" + aPlayer.getBal() + " ";
+
+                                NameTagChanger.changePlayerName(player, money, "", TeamAction.UPDATE);
+
+                                //arena.incrementPot(arena.getEntranceFee());
+                                String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+                                arena.msg(aPlayer.get(), balIncMsg);
+                                Set<Score> scores = player.getScoreboard().getScores(ChatColor.GREEN + "Balance:");
+                                for (Score score: scores){
+                                    score.setScore(aPlayer.getBal());
                                 }
                             }
-                         arena.start();
-                         return;
+
+                            arena.start();
                         } else {
                             System.out.println("entry false");
                             // prompt user with purchase code
-                            return;
+                            arena.msg(aPlayer.get(), "pay to enter");
+                            arena.msg(aPlayer.get(), "https://179e486d18f494.lhr.life");
                         }
+                        return;
                     } else if (error.isEmpty()) {
                         arena.countDown();
                         return;
@@ -757,17 +763,21 @@ public class PlayerListener implements Listener {
                 ServerClient conn = new ServerClient();
                 // first, set-up player.
                 String playerName = aPlayer.getName();
-                String serverUID = ServerInfoManager.getServerUID();
+                String gameUID = arena.getGameUID();
                 // TODO: remove hard-coded... add multiplier logic
-                int currentMultiplier = 1;
-
-                ServerUtils.setupPlayer(conn, playerName, serverUID, currentMultiplier);
+                int currentMultiplier = GetCurrentMult.getCurrentMult(arena);
+                if (currentMultiplier < 0){
+                    System.out.println("error getting currMult");
+                }
+                // TODO: yes mult or no mult? to be tested
+                currentMultiplier = 1;
+                int fixedEntranceFee = arena.getEntranceFee();
+                ServerUtils.setupPlayer(conn, playerName, gameUID, currentMultiplier, fixedEntranceFee);
 
                 // considerations --> is waiting for response from server thread-blocking?
                 // cuz while this may be good for 1 player situation, can fuck up whole server
-                JSONObject reply = ServerUtils.isPlayerAuthorized(conn, playerName, serverUID, currentMultiplier);
+                JSONObject reply = ServerUtils.isPlayerAuthorized(conn, playerName, gameUID, currentMultiplier);
                 boolean entry = (boolean) reply.get("entry");
-
 
                 // if entry: true, proceed
                 // else: send player link to payment
@@ -785,81 +795,43 @@ public class PlayerListener implements Listener {
                     // to join
 
                     int respawns = Integer.parseInt((String) reply.get("respawns"));
-                    if (respawns == 3){
+                    if (respawns == 2){
+                        /*
                         reply.put("gameUID", arena.getGameUID());
-                        ServerUtils.updatePlayerToSC(conn, reply);
-                    }
+                        ServerUtils.addShares(conn, reply);
 
-                    // TODO: properly calc player bal based on nonce, mult, and arena.getEntranceFee();
-                    aPlayer.incBal(arena.getEntranceFee());
+                         */
+                        // TODO: properly calc player bal based on nonce, mult, and arena.getEntranceFee();
+                        int amt = arena.getEntranceFee() * currentMultiplier;
+                        aPlayer.incBal(amt);
 
-                    arena.incrementPot(arena.getEntranceFee());
-                    String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+                        // also inc arena total liquidty
+                        arena.incrementPot(amt);
+                        aPlayer.incShares(1);
 
-                    final Set<ArenaPlayer> players = arena.getFighters();
-                    for (final ArenaPlayer ap : players) {
-                        if (ap.get() != null) {
-                            if (ap.getName().equals(aPlayer.getName())){
-                                arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
-                            } else {
-                                arena.msg(ap.get(), balIncMsg);
-                            }
+                        //arena.incrementPot(arena.getEntranceFee());
+                        String money = "$" + aPlayer.getBal() + " ";
+                        NameTagChanger.changePlayerName(player, money, "", TeamAction.UPDATE);
+
+                        String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
+                        arena.msg(aPlayer.get(), balIncMsg);
+                        Set<Score> scores = player.getScoreboard().getScores(ChatColor.GREEN + "Balance:");
+                        for (Score score: scores){
+                            score.setScore(aPlayer.getBal());
                         }
                     }
 
+
+
                 } else {
                     System.out.println("entry false");
+                    arena.msg(aPlayer.get(), "pay to enter");
+                    arena.msg(aPlayer.get(), "https://179e486d18f494.lhr.life");
                     // prompt user with purchase code
                     return;
                 }
 
-                /*
-                // check player eligibility
-                // mjsong TODO:
-                System.out.println("CHECKING ENTRANCE OF PLAYER WHILE FIGHT IN PROGRESS!!");
-                JSONObject entrance = new JSONObject();
-                JSONObject feeDetails = new JSONObject();
-                feeDetails.put("requesting player", aPlayer.getName());
-                feeDetails.put("entrancefee", arena.getEntranceFee());
-                entrance.put("entrance request",feeDetails);
-                ServerClient conn = new ServerClient();
-                try {
-                    conn.playerEnterSC(entrance);
-                    System.out.println("http send success, at least on client side. check server");
-                } catch (Exception e){
-                    System.out.println(e);
-                }
-                // inc playerBal
-
-                aPlayer.incBal(arena.getEntranceFee());
-
-                arena.incrementPot(arena.getEntranceFee());
-                String balIncMsg = aPlayer.getName() + "'s balance:" + (aPlayer.getBal()-arena.getEntranceFee()) + "-->" + aPlayer.getBal();
-
-                final Set<ArenaPlayer> players = arena.getFighters();
-                for (final ArenaPlayer ap : players) {
-                    if (ap.get() != null) {
-                        if (ap.getName().equals(aPlayer.getName())){
-                            arena.msg(ap.get(), "your balance " + (ap.getBal()-arena.getEntranceFee()) + "-->" + ap.getBal());
-                        } else {
-                            arena.msg(ap.get(), balIncMsg);
-                        }
-                    }
-                }
-
-                // disable pot mode for now
-                /*
-                // inc pot (All players will be called by this after first player
-                // touches IRON BLOCK and calls arena.start() at line 687
-                arena.incrementPot(arena.getEntranceFee());
-                String potIncMsg = "new Pot Size:" + arena.getPot();
-
-                for (final ArenaPlayer ap : players) {
-                    if (ap.get() != null) {
-                        arena.msg(ap.get(), potIncMsg);
-                    }
-                }
-                 */
+                // mjsong code end
 
 
                 final Set<PASpawn> spawns = new HashSet<>();
@@ -954,7 +926,10 @@ public class PlayerListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onPlayerJoin(final PlayerJoinEvent event) {
+
         final Player player = event.getPlayer();
+
+
 
         if (player.isDead()) {
             return;

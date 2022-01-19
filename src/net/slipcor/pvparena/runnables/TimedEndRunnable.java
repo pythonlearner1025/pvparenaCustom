@@ -64,4 +64,8 @@ public class TimedEndRunnable extends ArenaRunnable {
     public void incrementTime(int extraTime){
         seconds += extraTime;
     }
+
+    public int getCurrentMultiplier(){
+        return multiplier;
+    }
 }

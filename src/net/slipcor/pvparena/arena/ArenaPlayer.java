@@ -23,6 +23,9 @@ import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 
 import java.io.File;
@@ -68,7 +71,16 @@ public class ArenaPlayer {
 
     //mjsong code
     private int bal;
+
+    private int shares;
     // pubkey associated w/ player that will be rewarded
+
+    public Score balance;
+
+    public void assignScore(Score bal){
+        balance = bal;
+    }
+
     private String pubKey;
     //
     public int getBal(){
@@ -90,6 +102,13 @@ public class ArenaPlayer {
     public String getPubKey() {
         return pubKey;
     }
+
+    public int getShares() { return shares;}
+
+    public void incShares(int amt) { shares+=amt;}
+
+    public void zeroShares(){shares=0;}
+
     /**
      * Status
      *
@@ -134,6 +153,7 @@ public class ArenaPlayer {
     private final PABlockLocation[] selection = new PABlockLocation[2];
 
     private ArenaPlayer(final String playerName) {
+
         this.name = playerName;
     }
 

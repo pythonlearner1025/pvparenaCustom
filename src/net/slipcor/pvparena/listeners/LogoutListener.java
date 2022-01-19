@@ -12,7 +12,7 @@ import org.json.simple.JSONObject;
 
 public class LogoutListener implements Listener {
     @EventHandler
-    public void normalLogin(PlayerQuitEvent event) throws Exception {
+    public void normalLogout(PlayerQuitEvent event) throws Exception {
         // send info about login of player to redis server
         Player leftPlayer = event.getPlayer();
         String leftPlayerName = leftPlayer.getName();

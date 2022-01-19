@@ -12,6 +12,7 @@ import net.slipcor.pvparena.core.Help;
 import net.slipcor.pvparena.core.Language;
 import net.slipcor.pvparena.core.Language.MSG;
 import net.slipcor.pvparena.core.StringParser;
+import net.slipcor.pvparena.hook.ArenaExpansion;
 import net.slipcor.pvparena.listeners.*;
 import net.slipcor.pvparena.loadables.ArenaGoalManager;
 import net.slipcor.pvparena.loadables.ArenaModule;
@@ -22,7 +23,6 @@ import net.slipcor.pvparena.managers.ServerInfoManager;
 import net.slipcor.pvparena.managers.StatisticsManager;
 import net.slipcor.pvparena.managers.TabManager;
 import net.slipcor.pvparena.updater.UpdateChecker;
-import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -375,12 +375,12 @@ public class PVPArena extends JavaPlugin {
 
     @Override
     public void onEnable() {
+
         shuttingDown = false;
         instance = this;
         debugger = new Debug(1);
 
         //Enable bStats
-        Metrics metrics = new Metrics(this, BSTATS_PLUGIN_ID);
 
         saveDefaultConfig();
         if (!getConfig().contains("shortcuts")) {
